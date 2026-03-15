@@ -2013,10 +2013,10 @@ function exportCSV(){
 //  INIT
 // ═══════════════════════════════════════
 window.addEventListener('load',()=>{
+  document.getElementById('loading').style.display='none';
   setupChartEvents();
   updateKeyIndicator();
   if(!getKey()) {
-    // Show modal on first visit
     openKeyModal();
   } else {
     loadData();
