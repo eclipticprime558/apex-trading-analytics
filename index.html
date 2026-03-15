@@ -481,6 +481,7 @@ body{
   min-width:90px;
 }
 .pulse-item:first-child{padding-left:0;}
+.pulse-item:hover{background:rgba(88,166,255,.08);border-radius:4px;}
 .pulse-sym{font-size:10px;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;}
 .pulse-price{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;}
 .pulse-chg{font-family:'JetBrains Mono',monospace;font-size:11px;}
@@ -2722,7 +2723,8 @@ function renderPulseBar(quotes) {
     const chg    = q.regularMarketChangePercent;
     const chgStr = chg != null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '—';
     const cls    = chg == null ? '' : chg >= 0 ? 'up' : 'dn';
-    return `<div class="pulse-item">
+    const clickSym = sym.replace('^','%5E'); // keep ^ for VIX
+    return `<div class="pulse-item" onclick="loadPickStock('${sym}')" title="Click to open ${sym.replace('^','')} chart" style="cursor:pointer;">
       <span class="pulse-sym">${sym.replace('^','')}</span>
       <span class="pulse-price">${price}</span>
       <span class="pulse-chg ${cls}">${chgStr}</span>
