@@ -41,23 +41,27 @@ body{
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 
 /* ── Loading ── */
+/* Loading — thin top bar, non-blocking */
 #loading{
-  position:fixed;inset:0;background:rgba(13,17,23,0.92);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:9999;gap:16px;
+  position:fixed;top:0;left:0;right:0;height:3px;
+  background:transparent;z-index:9999;display:none;
 }
-.spinner{
-  width:44px;height:44px;border:2px solid var(--border2);
-  border-top-color:var(--accent);border-radius:50%;
-  animation:spin .7s linear infinite;
+#loadingBar{
+  height:100%;width:0%;background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+  animation:loadProgress 2.5s ease-in-out infinite;
 }
+@keyframes loadProgress{0%{width:0%}60%{width:85%}100%{width:95%}}
+.spinner{display:none;}
+.loading-label{display:none;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.loading-label{
-  font-family:'JetBrains Mono',monospace;font-size:11px;
-  color:var(--accent);letter-spacing:3px;
-  animation:blink 1s ease-in-out infinite;
-}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+/* Small inline spinner for Load button */
+.btn-load.loading{opacity:.7;pointer-events:none;}
+.btn-load.loading::after{
+  content:' ⟳';display:inline-block;
+  animation:spin .6s linear infinite;
+}
 
 /* ── Header ── */
 .header{
@@ -516,17 +520,14 @@ body{
   </div>
 </div>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <div class="loading-label">FETCHING MARKET DATA</div>
-</div>
+<div id="loading"><div id="loadingBar"></div></div>
 
 <!-- Header -->
 <header class="header">
   <div class="logo">⬡ APEX<span>TRADING ANALYTICS</span></div>
 
   <div class="search-wrap">
-    <input class="search-input" id="searchInput" type="text" placeholder="Search ticker or company..." autocomplete="off">
+    <input class="search-input" id="searchInput" type="text" placeholder="Enter ticker: AAPL, TSLA, SPY..." autocomplete="off">
     <div class="autocomplete-drop" id="acDrop"></div>
   </div>
 
@@ -917,7 +918,25 @@ function highlightAC(items) {
 }
 
 async function fetchSuggestions(q) {
-  if(!getKey()){acDrop.style.display='none';return;}
+  if(!getKey()){
+    // No Finnhub key — show common tickers as hints
+    const common = ['AAPL','MSFT','GOOGL','AMZN','TSLA','META','NVDA','SPY','QQQ','BRK.B','JPM','V','WMT','XOM','JNJ'];
+    const matches = common.filter(t=>t.startsWith(q.toUpperCase())).slice(0,5);
+    if(!matches.length){acDrop.style.display='none';return;}
+    acDrop.innerHTML = matches.map(t=>`
+      <div class="ac-item" data-ticker="${t}" data-name="">
+        <span class="ac-ticker">${t}</span>
+        <span class="ac-name" style="color:var(--text3)">Add Finnhub key for full company search</span>
+      </div>`).join('');
+    acDrop.style.display='block';
+    acDrop.querySelectorAll('.ac-item').forEach(el=>{
+      el.addEventListener('click',()=>{
+        ticker=el.dataset.ticker; searchInput.value=ticker;
+        acDrop.style.display='none'; loadData();
+      });
+    });
+    return;
+  }
   try {
     const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
     const results = (json?.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETF'||r.type==='ADR'||r.type==='Crypto');
@@ -951,18 +970,29 @@ const YH_PROXIES = [
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
   u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+  u=>`https://cors.sh/?${u}`,
 ];
-async function yhFetch(url, ms=9000) {
-  for(const fn of YH_PROXIES){
-    try{
-      const r = await Promise.race([fetch(fn(url)),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
-      if(!r.ok) continue;
-      const txt=await r.text();
-      if(!txt.trim().startsWith('{')) continue;
-      return JSON.parse(txt);
-    }catch(e){continue;}
+// Race ALL proxies simultaneously — use whichever responds first
+async function yhFetch(url) {
+  const timeout = 7000;
+  const tryProxy = fn => new Promise((resolve, reject) => {
+    const t = setTimeout(()=>reject(new Error('timeout')), timeout);
+    fetch(fn(url))
+      .then(async r => {
+        clearTimeout(t);
+        if(!r.ok) return reject(new Error('HTTP '+r.status));
+        const txt = await r.text();
+        if(!txt.trim().startsWith('{')&&!txt.trim().startsWith('['))
+          return reject(new Error('non-json'));
+        resolve(JSON.parse(txt));
+      })
+      .catch(e=>{ clearTimeout(t); reject(e); });
+  });
+  try {
+    return await Promise.any(YH_PROXIES.map(tryProxy));
+  } catch(e) {
+    throw new Error('Unable to reach market data. Try a different browser, disable ad-blockers, or check your connection.');
   }
-  throw new Error('All data sources failed. Check your internet connection and try again.');
 }
 async function loadCandlesYahoo(sym, interval, range) {
   const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${interval}&range=${range}&includePrePost=false`;
@@ -996,8 +1026,9 @@ async function loadData() {
   const range    = document.getElementById('rangeSelect').value;
   const interval = document.getElementById('intervalSelect').value;
 
-  document.getElementById('loading').style.display='flex';
+  document.getElementById('loading').style.display='block';
   document.getElementById('alertBox').style.display='none';
+  document.querySelector('.btn-load').classList.add('loading');
 
   try {
     let source = 'Yahoo Finance';
@@ -1069,6 +1100,7 @@ async function loadData() {
     el.innerHTML=`⚠ ${e.message}`;
   } finally {
     document.getElementById('loading').style.display='none';
+    document.querySelector('.btn-load').classList.remove('loading');
   }
 }
 
