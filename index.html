@@ -845,10 +845,14 @@ body{
         <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)"><span class="dot"></span>MACD</button>
         <button class="toggle-btn on" data-ind="pred" onclick="toggleInd('pred',this)"><span class="dot"></span>Forecast</button>
         <button class="toggle-btn on" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)"><span class="dot"></span>Trade Lines</button>
+        <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+        <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">⬚ Range Zoom</button>
+        <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">↩ Reset</button>
       </div>
       <div class="chart-outer" id="chartOuter">
         <canvas id="mainCanvas"></canvas>
         <div class="chart-tooltip" id="chartTip"></div>
+        <div id="selBox" style="position:absolute;display:none;pointer-events:none;border:2px solid var(--accent);background:rgba(88,166,255,.08);box-shadow:inset 0 0 0 1px rgba(88,166,255,.3);"></div>
       </div>
     </div>
   </div>
@@ -1050,6 +1054,7 @@ let viewCount = 80;  // how many candles to show
 let isDragging = false;
 let dragStartX = 0, dragStartView = 0;
 let hoverIdx = -1;
+let isSelecting = false, selStartX = 0, selCurX = 0;
 let liveRefreshTimer = null;
 let countdown = 30;
 
@@ -2365,19 +2370,96 @@ function setupChartEvents() {
 
   canvas.addEventListener('mouseleave',()=>{tip.style.display='none';hoverIdx=-1;drawChart();});
 
-  canvas.addEventListener('mousedown', e=>{
-    isDragging=true;dragStartX=e.clientX;dragStartView=viewStart;
-    canvas.style.cursor='grabbing';
+  canvas.addEventListener('mousedown', e => {
+    if(e.shiftKey || selModeActive) {
+      // Range-select zoom
+      isSelecting = true; isDragging = false;
+      const rect = canvas.getBoundingClientRect();
+      selStartX = selCurX = e.clientX - rect.left;
+      updateSelBox(rect);
+      canvas.style.cursor = 'col-resize';
+      e.preventDefault();
+    } else {
+      isDragging = true; dragStartX = e.clientX; dragStartView = viewStart;
+      canvas.style.cursor = 'grabbing';
+    }
   });
-  window.addEventListener('mouseup',()=>{isDragging=false;canvas.style.cursor='crosshair';});
 
-  canvas.addEventListener('wheel', e=>{
+  window.addEventListener('mousemove', e => {
+    if(isSelecting) {
+      const rect = canvas.getBoundingClientRect();
+      selCurX = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
+      updateSelBox(rect);
+    }
+  });
+
+  window.addEventListener('mouseup', e => {
+    if(isSelecting) {
+      isSelecting = false;
+      document.getElementById('selBox').style.display = 'none';
+      const rect = canvas.getBoundingClientRect();
+      const x1 = Math.min(selStartX, selCurX);
+      const x2 = Math.max(selStartX, selCurX);
+      if(x2 - x1 > 10) zoomToRange(x1, x2, rect.width);
+      if(selModeActive) toggleSelMode(); // auto-exit select mode
+      canvas.style.cursor = 'crosshair';
+    }
+    isDragging = false;
+    canvas.style.cursor = 'crosshair';
+  });
+
+  // Double-click = reset zoom
+  canvas.addEventListener('dblclick', () => resetZoom());
+
+  canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    const delta=e.deltaY>0?5:-5;
-    viewCount=Math.max(20,Math.min(rawData.length,viewCount+delta));
-    viewStart=Math.max(0,Math.min(rawData.length-viewCount,viewStart));
+    const delta = e.deltaY > 0 ? 5 : -5;
+    viewCount = Math.max(10, Math.min(rawData.length, viewCount + delta));
+    viewStart = Math.max(0, Math.min(rawData.length - viewCount, viewStart));
+    document.getElementById('resetZoomBtn').style.display = viewCount < rawData.length ? '' : 'none';
     drawChart();
-  },{passive:false});
+  }, {passive:false});
+}
+
+let selModeActive = false;
+function toggleSelMode() {
+  selModeActive = !selModeActive;
+  const btn = document.getElementById('selModeBtn');
+  btn.classList.toggle('on', selModeActive);
+  document.getElementById('mainCanvas').style.cursor = selModeActive ? 'col-resize' : 'crosshair';
+}
+
+function updateSelBox(rect) {
+  const box = document.getElementById('selBox');
+  const x1 = Math.min(selStartX, selCurX), x2 = Math.max(selStartX, selCurX);
+  const outer = document.getElementById('chartOuter');
+  const oRect = outer.getBoundingClientRect();
+  box.style.left   = x1 + 'px';
+  box.style.top    = '0px';
+  box.style.width  = (x2 - x1) + 'px';
+  box.style.height = outer.clientHeight + 'px';
+  box.style.display = (x2 - x1) > 2 ? 'block' : 'none';
+}
+
+function zoomToRange(x1, x2, canvasWidth) {
+  const PAD_L = 62, PAD_R = 60;
+  const chartW = canvasWidth - PAD_L - PAD_R;
+  const step   = chartW / (viewCount + 1);
+  const i1 = Math.max(0, Math.floor((x1 - PAD_L) / step));
+  const i2 = Math.min(viewCount - 1, Math.ceil((x2 - PAD_L) / step));
+  if(i2 - i1 < 2) return;
+  viewStart = Math.max(0, viewStart + i1);
+  viewCount = Math.max(5, i2 - i1 + 1);
+  viewStart = Math.max(0, Math.min(rawData.length - viewCount, viewStart));
+  document.getElementById('resetZoomBtn').style.display = '';
+  drawChart();
+}
+
+function resetZoom() {
+  viewCount = Math.min(rawData.length, 80);
+  viewStart = Math.max(0, rawData.length - viewCount);
+  document.getElementById('resetZoomBtn').style.display = 'none';
+  drawChart();
 }
 
 // ═══════════════════════════════════════
