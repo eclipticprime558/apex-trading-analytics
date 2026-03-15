@@ -1504,6 +1504,8 @@ async function loadData() {
     document.getElementById('chartTitle').textContent = `${ticker} — ${interval.toUpperCase()} / ${range.toUpperCase()}`;
     document.getElementById('chartSubtitle').textContent = companyName + (source==='Yahoo Finance'?' (Yahoo Finance)':'');
     startRefreshTimer();
+    // Update URL so back button knows which stock we're on
+    if(!_navSuppressPush) history.replaceState({view:'chart',ticker}, '', `#chart/${ticker}`);
 
   } catch(e) {
     const el = document.getElementById('alertBox');
@@ -2586,6 +2588,32 @@ function exportCSV(){
 let picksRefreshTimer = null;
 let picksLoaded = false;
 
+// ── History / back-button routing ──
+let _navSuppressPush = false;
+
+function pushNav(state) {
+  if(_navSuppressPush) return;
+  const url = state.view === 'chart' ? `#chart/${state.ticker||''}` : '#picks';
+  history.pushState(state, '', url);
+}
+
+function restoreNav(state) {
+  if(!state) return;
+  _navSuppressPush = true;
+  if(state.view === 'chart' && state.ticker) {
+    ticker = state.ticker;
+    companyName = '';
+    document.getElementById('searchInput').value = state.ticker;
+    switchView('chart', document.getElementById('viewBtnChart'));
+    loadData();
+  } else {
+    switchView('picks', document.getElementById('viewBtnPicks'));
+  }
+  _navSuppressPush = false;
+}
+
+window.addEventListener('popstate', e => restoreNav(e.state));
+
 function switchView(view, el) {
   dbg(`switchView(${view})`);
   document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
@@ -2600,12 +2628,14 @@ function switchView(view, el) {
     if(!picksLoaded) loadPicks();
     clearInterval(picksRefreshTimer);
     picksRefreshTimer = setInterval(loadPicks, 90000);
+    pushNav({view:'picks'});
   } else {
     picksView.style.display = 'none';
     clearInterval(picksRefreshTimer);
     chartView.style.display = 'grid';
     if(rawData.length) qBar.style.display = 'flex';
-    else loadData(); // auto-load default ticker on first visit to chart
+    else loadData();
+    pushNav({view:'chart', ticker});
   }
 }
 
@@ -3061,6 +3091,8 @@ function loadPickStock(sym) {
   ticker = sym;
   companyName = '';
   document.getElementById('searchInput').value = sym;
+  // Push picks as the state to return to, then chart on top
+  if(history.state?.view !== 'picks') pushNav({view:'picks'});
   switchView('chart', document.getElementById('viewBtnChart'));
   loadData();
 }
@@ -3073,7 +3105,20 @@ window.addEventListener('load',()=>{
   dbg('Page loaded — initializing APEX');
   dbg(`Proxy endpoint: /api/proxy`);
   setupChartEvents();
-  switchView('picks', document.getElementById('viewBtnPicks'));
+  // Restore from URL hash if present (e.g. #chart/AAPL)
+  const hash = location.hash;
+  const chartMatch = hash.match(/^#chart\/(.+)$/);
+  if(chartMatch) {
+    ticker = chartMatch[1];
+    document.getElementById('searchInput').value = ticker;
+    _navSuppressPush = true;
+    switchView('chart', document.getElementById('viewBtnChart'));
+    _navSuppressPush = false;
+    history.replaceState({view:'chart',ticker}, '', hash);
+  } else {
+    switchView('picks', document.getElementById('viewBtnPicks'));
+    history.replaceState({view:'picks'}, '', '#picks');
+  }
 });
 window.addEventListener('resize',()=>{if(rawData.length)drawChart();});
 
