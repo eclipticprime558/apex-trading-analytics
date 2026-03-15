@@ -1015,8 +1015,7 @@ async function fetchSuggestions(q) {
 
   // Fallback: Finnhub search
   try {
-    {
-      const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
+    const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
       const results = (json?.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETF'||r.type==='ADR'||r.type==='Crypto');
       if(results.length) {
         acSelected = -1;
@@ -1039,8 +1038,7 @@ async function fetchSuggestions(q) {
         });
         return;
       }
-    } catch(e){}
-  }
+  } catch(e){}
 
   // Last resort: static common ticker list
   const common = ['AAPL','MSFT','GOOGL','AMZN','TSLA','META','NVDA','SPY','QQQ','BRK.B','JPM','V','WMT','XOM','JNJ','AMD','NFLX','DIS','BABA','UBER'];
@@ -1112,8 +1110,7 @@ async function loadData() {
 
     // ── Try Finnhub first ──
     try {
-      {
-        const res    = toFinnhubRes(interval);
+      const res    = toFinnhubRes(interval);
         const toTs   = Math.floor(Date.now()/1000);
         const fromTs = toTs - rangeToSeconds(range);
         const candles = await finnhubFetch(
@@ -1138,10 +1135,9 @@ async function loadData() {
             .then(p=>{ if(p?.name){companyName=p.name;document.getElementById('qCompany').textContent=companyName;} })
             .catch(()=>{});
         }
-      } catch(e) {
-        // Finnhub failed — fall through to Yahoo Finance
-        rawData = [];
-      }
+    } catch(e) {
+      // Finnhub failed — fall through to Yahoo Finance
+      rawData = [];
     }
 
     // ── Fall back to Yahoo Finance if Finnhub gave nothing ──
