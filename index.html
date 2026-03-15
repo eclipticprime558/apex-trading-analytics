@@ -944,6 +944,48 @@ async function fetchSuggestions(q) {
 }
 
 // ═══════════════════════════════════════
+//  YAHOO FINANCE FALLBACK
+// ═══════════════════════════════════════
+const YH_PROXIES = [
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+];
+async function yhFetch(url, ms=9000) {
+  for(const fn of YH_PROXIES){
+    try{
+      const r = await Promise.race([fetch(fn(url)),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+      if(!r.ok) continue;
+      const txt=await r.text();
+      if(!txt.trim().startsWith('{')) continue;
+      return JSON.parse(txt);
+    }catch(e){continue;}
+  }
+  throw new Error('All data sources failed. Check your internet connection and try again.');
+}
+async function loadCandlesYahoo(sym, interval, range) {
+  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${interval}&range=${range}&includePrePost=false`;
+  let json;
+  try{ json=await yhFetch(url); }
+  catch(e){
+    const url2=url.replace('query1','query2');
+    json=await yhFetch(url2);
+  }
+  const result=json?.chart?.result?.[0];
+  if(!result) throw new Error(json?.chart?.error?.description||`No data for "${sym}"`);
+  if(!companyName) companyName=result.meta?.longName||result.meta?.shortName||sym;
+  const ts=result.timestamp, q=result.indicators.quote[0];
+  const rows=[];
+  for(let i=0;i<ts.length;i++){
+    if(q.close[i]==null||q.open[i]==null) continue;
+    rows.push({date:new Date(ts[i]*1000),open:+q.open[i].toFixed(4),high:+q.high[i].toFixed(4),
+      low:+q.low[i].toFixed(4),close:+q.close[i].toFixed(4),volume:q.volume[i]||0});
+  }
+  return rows;
+}
+
+// ═══════════════════════════════════════
 //  LOAD DATA
 // ═══════════════════════════════════════
 async function loadData() {
@@ -951,47 +993,56 @@ async function loadData() {
   if(inputVal) ticker = inputVal;
   if(!ticker) return;
 
-  // No key → prompt
-  if(!getKey()) {
-    openKeyModal();
-    return;
-  }
-
   const range    = document.getElementById('rangeSelect').value;
   const interval = document.getElementById('intervalSelect').value;
-  const res      = toFinnhubRes(interval);
-  const toTs     = Math.floor(Date.now()/1000);
-  const fromTs   = toTs - rangeToSeconds(range);
 
   document.getElementById('loading').style.display='flex';
   document.getElementById('alertBox').style.display='none';
 
   try {
-    // Candle data
-    const candles = await finnhubFetch(
-      `/stock/candle?symbol=${encodeURIComponent(ticker)}&resolution=${res}&from=${fromTs}&to=${toTs}`
-    );
-    if(candles.s==='no_data'||!candles.t?.length)
-      throw new Error(`No data for "${ticker}". Check the symbol — try US tickers like AAPL, TSLA, SPY, BTC-USD.`);
+    let source = 'Yahoo Finance';
 
-    // Company profile (non-blocking)
-    finnhubFetch(`/stock/profile2?symbol=${encodeURIComponent(ticker)}`)
-      .then(p=>{ if(p?.name) companyName=p.name; document.getElementById('qCompany').textContent=companyName; })
-      .catch(()=>{});
+    // ── Try Finnhub first if key is set ──
+    if(getKey()) {
+      try {
+        const res    = toFinnhubRes(interval);
+        const toTs   = Math.floor(Date.now()/1000);
+        const fromTs = toTs - rangeToSeconds(range);
+        const candles = await finnhubFetch(
+          `/stock/candle?symbol=${encodeURIComponent(ticker)}&resolution=${res}&from=${fromTs}&to=${toTs}`
+        );
+        if(candles.s==='no_data'||!candles.t?.length)
+          throw new Error('no_data');
 
-    rawData = [];
-    for(let i=0;i<candles.t.length;i++){
-      if(candles.c[i]==null||candles.o[i]==null) continue;
-      rawData.push({
-        date:   new Date(candles.t[i]*1000),
-        open:   +candles.o[i].toFixed(4),
-        high:   +candles.h[i].toFixed(4),
-        low:    +candles.l[i].toFixed(4),
-        close:  +candles.c[i].toFixed(4),
-        volume: candles.v[i]||0,
-      });
+        rawData = [];
+        for(let i=0;i<candles.t.length;i++){
+          if(candles.c[i]==null||candles.o[i]==null) continue;
+          rawData.push({
+            date:new Date(candles.t[i]*1000),open:+candles.o[i].toFixed(4),
+            high:+candles.h[i].toFixed(4),low:+candles.l[i].toFixed(4),
+            close:+candles.c[i].toFixed(4),volume:candles.v[i]||0,
+          });
+        }
+        if(rawData.length) {
+          source = 'Finnhub';
+          // Company profile (non-blocking)
+          finnhubFetch(`/stock/profile2?symbol=${encodeURIComponent(ticker)}`)
+            .then(p=>{ if(p?.name){companyName=p.name;document.getElementById('qCompany').textContent=companyName;} })
+            .catch(()=>{});
+        }
+      } catch(e) {
+        // Finnhub failed — fall through to Yahoo Finance
+        rawData = [];
+      }
     }
-    if(!rawData.length) throw new Error('Dataset empty after parsing.');
+
+    // ── Fall back to Yahoo Finance if Finnhub gave nothing ──
+    if(!rawData.length) {
+      rawData = await loadCandlesYahoo(ticker, interval, range);
+      source  = 'Yahoo Finance';
+    }
+
+    if(!rawData.length) throw new Error(`No data returned for "${ticker}". Check the symbol and try again.`);
 
     viewCount = Math.min(rawData.length, 80);
     viewStart = Math.max(0, rawData.length - viewCount);
@@ -1009,13 +1060,13 @@ async function loadData() {
 
     document.getElementById('quoteBar').style.display='flex';
     document.getElementById('chartTitle').textContent = `${ticker} — ${interval.toUpperCase()} / ${range.toUpperCase()}`;
-    document.getElementById('chartSubtitle').textContent = companyName;
+    document.getElementById('chartSubtitle').textContent = companyName + (source==='Yahoo Finance'?' (Yahoo Finance)':'');
     startRefreshTimer();
 
   } catch(e) {
     const el = document.getElementById('alertBox');
     el.style.display='block';
-    el.innerHTML=`⚠ ${e.message} <span style="color:var(--text3);font-size:11px">— Check the ticker or try again (free proxies may be rate-limited).</span>`;
+    el.innerHTML=`⚠ ${e.message}`;
   } finally {
     document.getElementById('loading').style.display='none';
   }
