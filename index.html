@@ -2368,7 +2368,7 @@ function loadPickStock(sym) {
 window.addEventListener('load',()=>{
   document.getElementById('loading').style.display='none';
   setupChartEvents();
-  loadData();
+  switchView('picks', document.getElementById('viewBtnPicks'));
 });
 window.addEventListener('resize',()=>{if(rawData.length)drawChart();});
 </script>
