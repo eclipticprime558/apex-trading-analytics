@@ -598,6 +598,82 @@ body{
   font-size:9px;color:var(--text3);line-height:1.5;
 }
 
+/* ── Market Intelligence ── */
+.intel-section{
+  max-width:1700px;margin:0 auto;padding:0 16px 20px;
+}
+.intel-header{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:14px 0 10px;border-top:1px solid var(--border);
+  margin-top:4px;
+}
+.intel-title{font-size:13px;font-weight:700;color:var(--text);letter-spacing:.3px;}
+.intel-sub{font-size:11px;color:var(--text3);}
+.intel-market-note{
+  font-size:11px;padding:3px 10px;border-radius:4px;
+  background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3);
+}
+.intel-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+}
+@media(max-width:1000px){.intel-grid{grid-template-columns:1fr;}}
+.intel-col{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;
+}
+.intel-col-title{
+  font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+  padding:10px 14px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.02);color:var(--text2);
+}
+/* News cards */
+.news-item{
+  padding:10px 14px;border-bottom:1px solid rgba(48,54,61,.5);
+  cursor:pointer;transition:background .15s;
+}
+.news-item:last-child{border-bottom:none;}
+.news-item:hover{background:rgba(88,166,255,.04);}
+.news-headline{font-size:12px;color:var(--text);line-height:1.5;margin-bottom:4px;}
+.news-meta{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text3);}
+.news-source{color:var(--accent);}
+.news-sentiment{padding:1px 6px;border-radius:3px;font-weight:600;font-size:9px;}
+.ns-bull{background:rgba(63,185,80,.2);color:var(--green);}
+.ns-bear{background:rgba(248,81,73,.2);color:var(--red);}
+.ns-neut{background:rgba(139,148,158,.15);color:var(--text2);}
+/* Earnings cards */
+.earn-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;border-bottom:1px solid rgba(48,54,61,.5);
+  cursor:pointer;transition:background .15s;
+}
+.earn-item:last-child{border-bottom:none;}
+.earn-item:hover{background:rgba(88,166,255,.04);}
+.earn-sym{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;min-width:52px;}
+.earn-info{flex:1;}
+.earn-name{font-size:10px;color:var(--text2);}
+.earn-date{font-size:11px;color:var(--text);margin-top:2px;}
+.earn-badge{
+  font-size:9px;font-weight:600;letter-spacing:.5px;
+  padding:2px 7px;border-radius:3px;text-transform:uppercase;
+}
+.earn-pre{background:rgba(88,166,255,.15);color:var(--accent);}
+.earn-post{background:rgba(163,113,247,.15);color:var(--purple);}
+.earn-today{background:rgba(251,143,68,.2);color:var(--orange);animation:blink 1.5s infinite;}
+/* Catalyst items */
+.cat-item{
+  padding:10px 14px;border-bottom:1px solid rgba(48,54,61,.5);
+  cursor:pointer;transition:background .15s;
+}
+.cat-item:last-child{border-bottom:none;}
+.cat-item:hover{background:rgba(88,166,255,.04);}
+.cat-header{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.cat-sym{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--accent);}
+.cat-type{font-size:9px;font-weight:600;letter-spacing:.5px;padding:1px 6px;border-radius:3px;text-transform:uppercase;}
+.cat-bull{background:rgba(63,185,80,.2);color:var(--green);}
+.cat-bear{background:rgba(248,81,73,.2);color:var(--red);}
+.cat-watch{background:rgba(210,153,34,.2);color:var(--yellow);}
+.cat-headline{font-size:11px;color:var(--text2);line-height:1.5;}
+
 /* ── Help FAB + Drawer ── */
 .help-fab{
   position:fixed;bottom:24px;right:24px;z-index:8000;
@@ -798,6 +874,29 @@ body{
     </div>
   </div>
   <div class="picks-footer" id="picksFooter">⚠ Scores are technical momentum signals only — not financial advice. Always do your own research.</div>
+
+  <!-- Market Intelligence -->
+  <div class="intel-section">
+    <div class="intel-header">
+      <div class="intel-title">📡 Market Intelligence</div>
+      <div class="intel-sub">Breaking news · Earnings calendar · Catalysts to watch</div>
+      <div id="intelMarketNote" class="intel-market-note" style="display:none"></div>
+    </div>
+    <div class="intel-grid">
+      <div class="intel-col">
+        <div class="intel-col-title">📰 Breaking News</div>
+        <div id="newsContainer"><div class="picks-loading">Loading headlines…</div></div>
+      </div>
+      <div class="intel-col">
+        <div class="intel-col-title">📅 Earnings Calendar <span style="font-size:10px;color:var(--text3);font-weight:400;">— next 7 days</span></div>
+        <div id="earningsContainer"><div class="picks-loading">Loading earnings…</div></div>
+      </div>
+      <div class="intel-col">
+        <div class="intel-col-title">⚡ Company Catalysts</div>
+        <div id="catalystsContainer"><div class="picks-loading">Loading catalysts…</div></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Quote bar -->
@@ -834,17 +933,17 @@ body{
         <div style="font-size:11px;color:var(--text3)" id="chartSubtitle"></div>
       </div>
       <div class="chart-toolbar" id="toolbar">
-        <button class="toggle-btn on" data-ind="ma20" onclick="toggleInd('ma20',this)"><span class="dot"></span>MA20</button>
-        <button class="toggle-btn on" data-ind="ma50" onclick="toggleInd('ma50',this)"><span class="dot"></span>MA50</button>
-        <button class="toggle-btn" data-ind="ma200" onclick="toggleInd('ma200',this)"><span class="dot"></span>MA200</button>
-        <button class="toggle-btn" data-ind="ema9" onclick="toggleInd('ema9',this)"><span class="dot"></span>EMA9</button>
-        <button class="toggle-btn" data-ind="bb" onclick="toggleInd('bb',this)"><span class="dot"></span>Bollinger</button>
-        <button class="toggle-btn" data-ind="vwap" onclick="toggleInd('vwap',this)"><span class="dot"></span>VWAP</button>
-        <button class="toggle-btn on" data-ind="volume" onclick="toggleInd('volume',this)"><span class="dot"></span>Volume</button>
-        <button class="toggle-btn on" data-ind="rsi" onclick="toggleInd('rsi',this)"><span class="dot"></span>RSI</button>
-        <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)"><span class="dot"></span>MACD</button>
-        <button class="toggle-btn on" data-ind="pred" onclick="toggleInd('pred',this)"><span class="dot"></span>Forecast</button>
-        <button class="toggle-btn on" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)"><span class="dot"></span>Trade Lines</button>
+        <button class="toggle-btn on" data-ind="ma20" onclick="toggleInd('ma20',this)" title="MA20 — 20-period Moving Average. Price above = short-term uptrend. Acts as dynamic support/resistance."><span class="dot"></span>MA20</button>
+        <button class="toggle-btn on" data-ind="ma50" onclick="toggleInd('ma50',this)" title="MA50 — 50-period Moving Average. Most-watched trend line. Crossing above = bullish, below = bearish."><span class="dot"></span>MA50</button>
+        <button class="toggle-btn" data-ind="ma200" onclick="toggleInd('ma200',this)" title="MA200 — 200-period Moving Average. The long-term trend line. Price above = bull market, below = bear market."><span class="dot"></span>MA200</button>
+        <button class="toggle-btn" data-ind="ema9" onclick="toggleInd('ema9',this)" title="EMA9 — 9-period Exponential Moving Average. Reacts faster than MA to recent price. Great for short-term entries."><span class="dot"></span>EMA9</button>
+        <button class="toggle-btn" data-ind="bb" onclick="toggleInd('bb',this)" title="Bollinger Bands — Upper/lower bands = 2 standard deviations from the 20-day MA. Near upper = overbought. Near lower = oversold. Squeeze = breakout incoming."><span class="dot"></span>Bollinger</button>
+        <button class="toggle-btn" data-ind="vwap" onclick="toggleInd('vwap',this)" title="VWAP — Volume Weighted Average Price. The price institutions use as benchmark. Price above VWAP = bullish bias. Used heavily by day traders."><span class="dot"></span>VWAP</button>
+        <button class="toggle-btn on" data-ind="volume" onclick="toggleInd('volume',this)" title="Volume — Number of shares traded. High volume = strong conviction. Volume spike on a move = more reliable signal."><span class="dot"></span>Volume</button>
+        <button class="toggle-btn on" data-ind="rsi" onclick="toggleInd('rsi',this)" title="RSI (14) — Relative Strength Index. Measures speed of price movement. Above 70 = overbought (may reverse). Below 30 = oversold (may bounce). 50 = neutral."><span class="dot"></span>RSI</button>
+        <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)" title="MACD — Moving Average Convergence Divergence. When MACD line crosses above signal line = buy signal. Below = sell. Histogram shows momentum strength."><span class="dot"></span>MACD</button>
+        <button class="toggle-btn on" data-ind="pred" onclick="toggleInd('pred',this)" title="Forecast — 3 projected candles based on ATR volatility + RSI momentum + MACD direction. Shows probability range, not a guarantee."><span class="dot"></span>Forecast</button>
+        <button class="toggle-btn on" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)" title="Trade Lines — Shows Entry, Stop Loss, and Take Profit levels on the chart. Blue = entry, Red = stop loss, Green = TP1/2/3."><span class="dot"></span>Trade Lines</button>
         <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
         <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">⬚ Range Zoom</button>
         <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">↩ Reset</button>
@@ -2515,9 +2614,9 @@ function switchView(view, el) {
 const picksQuoteCache = {};  // cache quotes so tooltip can access them by symbol
 
 const WATCHLISTS = {
-  ai: ['NVDA','META','MSFT','AAPL','GOOGL','AMZN','TSLA','AMD','CRM','NFLX','UBER','SHOP'],
-  early: ['PLTR','SOFI','RIVN','IONQ','SOUN','BBAI','MARA','SMCI','RGTI','ACHR','RKLB','LUNR'],
-  sectors: ['XLK','XLF','XLE','XLV','XLI','XLY','XLC','GLD','SLV','TLT','XBI','ARKK'],
+  ai:      ['NVDA','META','MSFT','AAPL','GOOGL','AMZN','TSLA','AMD','CRM','NFLX','UBER','SHOP','ORCL','ADBE','QCOM','ARM','SNOW','DDOG','COIN','HOOD'],
+  early:   ['PLTR','SOFI','RIVN','IONQ','SOUN','BBAI','MARA','SMCI','RGTI','ACHR','RKLB','LUNR','SERV','KULR','MSTR','CORZ','HIMS','RDDT','CAVA','APP'],
+  sectors: ['XLK','XLF','XLE','XLV','XLI','XLY','XLC','GLD','SLV','TLT','XBI','ARKK','ARKG','BOTZ','ROBO','DRIV','ICLN','COPX','REMX','CIBR'],
 };
 const PULSE_SYMS = ['SPY','QQQ','DIA','IWM','^VIX'];
 
@@ -2605,6 +2704,7 @@ async function loadPicks() {
   renderPicksCol('col-ai',      WATCHLISTS.ai,      quotes);
   renderPicksCol('col-early',   WATCHLISTS.early,   quotes);
   renderPicksCol('col-sectors', WATCHLISTS.sectors, quotes);
+  loadMarketIntelligence();
 
   const ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'America/New_York'});
   document.getElementById('picksFooter').innerHTML =
@@ -2831,6 +2931,128 @@ function renderPicksCol(colId, tickers, quotes) {
       </div>
     </div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════
+//  MARKET INTELLIGENCE — NEWS + EARNINGS + CATALYSTS
+// ═══════════════════════════════════════
+async function loadMarketIntelligence() {
+  // Show market closed note if applicable
+  const now = new Date();
+  const day = now.toLocaleDateString('en-US',{weekday:'short',timeZone:'America/New_York'});
+  const h = parseInt(now.toLocaleTimeString('en-US',{hour:'2-digit',hour12:false,timeZone:'America/New_York'}));
+  const m = now.getMinutes(), mins = h*60+m;
+  const isWeekend = day==='Sat'||day==='Sun';
+  const isClosed  = isWeekend || mins < 570 || mins >= 960;
+  const note = document.getElementById('intelMarketNote');
+  if(isClosed) {
+    note.style.display='';
+    note.textContent = isWeekend
+      ? '⏸ Market closed (weekend) — scores reflect Friday\'s close. Live signals resume Monday 9:30 AM ET.'
+      : mins < 570
+        ? `⏸ Pre-market — regular session opens at 9:30 AM ET. Scores update when trading begins.`
+        : '⏸ After-hours — scores reflect today\'s close. Live signals resume next session.';
+  }
+
+  // Load all three in parallel
+  await Promise.allSettled([loadNews(), loadEarnings(), loadCatalysts()]);
+}
+
+async function loadNews() {
+  const el = document.getElementById('newsContainer');
+  try {
+    const json = await finnhubFetch('/news?category=general&minId=0');
+    const items = (json || []).slice(0, 12);
+    if(!items.length) { el.innerHTML='<div class="picks-loading">No news available</div>'; return; }
+    el.innerHTML = items.map(n => {
+      const age = timeAgo(n.datetime * 1000);
+      const sent = n.sentiment > 0.1 ? 'bull' : n.sentiment < -0.1 ? 'bear' : 'neut';
+      const sentLabel = sent==='bull' ? 'BULLISH' : sent==='bear' ? 'BEARISH' : 'NEUTRAL';
+      return `<div class="news-item" onclick="window.open('${n.url}','_blank')">
+        <div class="news-headline">${n.headline}</div>
+        <div class="news-meta">
+          <span class="news-source">${n.source}</span>
+          <span>${age}</span>
+          <span class="news-sentiment ns-${sent}">${sentLabel}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML=`<div class="picks-loading" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+async function loadEarnings() {
+  const el = document.getElementById('earningsContainer');
+  try {
+    const from = new Date().toISOString().split('T')[0];
+    const to   = new Date(Date.now()+7*864e5).toISOString().split('T')[0];
+    const json = await finnhubFetch(`/calendar/earnings?from=${from}&to=${to}`);
+    const items = (json?.earningsCalendar || []).slice(0, 18);
+    if(!items.length) { el.innerHTML='<div class="picks-loading">No earnings in next 7 days</div>'; return; }
+    el.innerHTML = items.map(e => {
+      const today = new Date().toISOString().split('T')[0];
+      const isToday = e.date === today;
+      const badge = isToday ? 'earn-today' : e.hour === 'bmo' ? 'earn-pre' : 'earn-post';
+      const badgeLabel = isToday ? '🔴 TODAY' : e.hour === 'bmo' ? 'PRE-MKT' : 'AFTER-HRS';
+      const eps = e.epsEstimate != null ? ` · EPS est. $${e.epsEstimate.toFixed(2)}` : '';
+      return `<div class="earn-item" onclick="loadPickStock('${e.symbol}')">
+        <div class="earn-sym">${e.symbol}</div>
+        <div class="earn-info">
+          <div class="earn-name">${e.name||e.symbol}${eps}</div>
+          <div class="earn-date">${formatEarnDate(e.date)}</div>
+        </div>
+        <span class="earn-badge ${badge}">${badgeLabel}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML=`<div class="picks-loading" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+async function loadCatalysts() {
+  const el = document.getElementById('catalystsContainer');
+  // Pull company news for high-interest stocks as catalyst signals
+  const watchSyms = ['NVDA','TSLA','AAPL','META','PLTR','IONQ','MSTR','ARM','COIN','SMCI'];
+  try {
+    const to   = new Date().toISOString().split('T')[0];
+    const from = new Date(Date.now()-3*864e5).toISOString().split('T')[0];
+    const allNews = [];
+    const fetches = watchSyms.slice(0,6).map(sym =>
+      finnhubFetch(`/company-news?symbol=${sym}&from=${from}&to=${to}`)
+        .then(items => (items||[]).slice(0,2).forEach(n => allNews.push({...n, _sym: sym})))
+        .catch(()=>{})
+    );
+    await Promise.allSettled(fetches);
+    allNews.sort((a,b) => b.datetime - a.datetime);
+    if(!allNews.length) { el.innerHTML='<div class="picks-loading">No recent catalysts</div>'; return; }
+    el.innerHTML = allNews.slice(0,10).map(n => {
+      const sent = n.sentiment > 0.1 ? 'bull' : n.sentiment < -0.1 ? 'bear' : 'watch';
+      const sentLabel = sent==='bull' ? '▲ BULLISH' : sent==='bear' ? '▼ BEARISH' : '◎ WATCH';
+      const age = timeAgo(n.datetime * 1000);
+      return `<div class="cat-item" onclick="window.open('${n.url}','_blank')">
+        <div class="cat-header">
+          <span class="cat-sym">${n._sym}</span>
+          <span class="cat-type cat-${sent}">${sentLabel}</span>
+          <span style="font-size:10px;color:var(--text3);margin-left:auto">${age}</span>
+        </div>
+        <div class="cat-headline">${n.headline}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML=`<div class="picks-loading" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+function timeAgo(ms) {
+  const s = Math.floor((Date.now()-ms)/1000);
+  if(s<60)  return s+'s ago';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+function formatEarnDate(d) {
+  return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 }
 
 function loadPickStock(sym) {
