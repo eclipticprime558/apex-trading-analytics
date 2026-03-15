@@ -323,6 +323,57 @@ body{
 .level-price{color:var(--text);font-weight:500;}
 .level-dist{color:var(--text3);font-size:10px;margin-left:auto;}
 
+/* Trade Setup card */
+.trade-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;
+}
+.trade-dir{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+}
+.trade-dir-label{
+  font-size:22px;font-weight:700;letter-spacing:1px;
+}
+.trade-dir-label.long{color:var(--green);}
+.trade-dir-label.short{color:var(--red);}
+.trade-dir-sub{font-size:10px;color:var(--text2);text-align:right;line-height:1.5;}
+.trade-levels{display:flex;flex-direction:column;}
+.tl-row{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px;border-bottom:1px solid rgba(48,54,61,0.5);
+}
+.tl-row:last-child{border-bottom:none;}
+.tl-badge{
+  font-size:9px;font-weight:700;letter-spacing:.5px;
+  padding:2px 7px;border-radius:4px;min-width:36px;text-align:center;
+  font-family:'Inter',sans-serif;text-transform:uppercase;
+}
+.tl-badge.entry{background:rgba(88,166,255,0.15);color:var(--accent);border:1px solid rgba(88,166,255,0.3);}
+.tl-badge.sl{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,81,73,0.3);}
+.tl-badge.tp1{background:rgba(63,185,80,0.2);color:var(--green);border:1px solid rgba(63,185,80,0.4);}
+.tl-badge.tp2{background:rgba(63,185,80,0.12);color:#69db7c;border:1px solid rgba(63,185,80,0.25);}
+.tl-badge.tp3{background:rgba(63,185,80,0.06);color:#95e0a0;border:1px solid rgba(63,185,80,0.15);}
+.tl-price{
+  font-family:'JetBrains Mono',monospace;font-size:14px;
+  font-weight:600;color:var(--text);
+}
+.tl-detail{margin-left:auto;text-align:right;line-height:1.4;}
+.tl-pct{font-family:'JetBrains Mono',monospace;font-size:11px;}
+.tl-desc{font-size:9px;color:var(--text3);}
+.trade-rr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:rgba(255,255,255,0.02);
+  border-top:1px solid var(--border);flex-wrap:wrap;gap:8px;
+}
+.rr-item{text-align:center;}
+.rr-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;}
+.rr-value{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;margin-top:2px;}
+.trade-disclaimer{
+  font-size:9px;color:var(--text3);padding:8px 14px;
+  border-top:1px solid var(--border);line-height:1.5;
+}
+
 /* Prediction panel */
 .pred-grid{
   display:grid;grid-template-columns:1fr 1fr;
@@ -488,6 +539,7 @@ body{
         <button class="toggle-btn on" data-ind="rsi" onclick="toggleInd('rsi',this)"><span class="dot"></span>RSI</button>
         <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)"><span class="dot"></span>MACD</button>
         <button class="toggle-btn on" data-ind="pred" onclick="toggleInd('pred',this)"><span class="dot"></span>Forecast</button>
+        <button class="toggle-btn on" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)"><span class="dot"></span>Trade Lines</button>
       </div>
       <div class="chart-outer" id="chartOuter">
         <canvas id="mainCanvas"></canvas>
@@ -506,6 +558,31 @@ body{
       <div class="signal-score" id="sigScore">Load data to analyze</div>
       <div class="signal-bar-wrap"><div class="signal-bar" id="sigBar" style="width:50%;background:var(--text3)"></div></div>
       <div class="signal-factors" id="sigFactors"></div>
+    </div>
+
+    <!-- Trade Setup -->
+    <div class="trade-card" id="tradeCard">
+      <div class="panel-hdr">
+        <div class="panel-title">Trade Setup</div>
+        <div style="font-size:10px;color:var(--text3)" id="tradeUpdated">Load data</div>
+      </div>
+      <div class="trade-dir" id="tradeDirRow">
+        <div>
+          <div class="trade-dir-label" id="tradeDirLabel">—</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">Suggested Direction</div>
+        </div>
+        <div class="trade-dir-sub" id="tradeDirSub">—</div>
+      </div>
+      <div class="trade-levels" id="tradeLevels">
+        <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Load data to generate setup</div>
+      </div>
+      <div class="trade-rr" id="tradeRR" style="display:none">
+        <div class="rr-item"><div class="rr-label">Risk $</div><div class="rr-value dn" id="rr_risk">—</div></div>
+        <div class="rr-item"><div class="rr-label">R/R Ratio</div><div class="rr-value" id="rr_ratio">—</div></div>
+        <div class="rr-item"><div class="rr-label">TP1 Reward $</div><div class="rr-value up" id="rr_reward">—</div></div>
+        <div class="rr-item"><div class="rr-label">Win needed</div><div class="rr-value neut" id="rr_winpct">—</div></div>
+      </div>
+      <div class="trade-disclaimer">⚠ Auto-calculated from ATR + S/R. Not financial advice. Always use your own judgement.</div>
     </div>
 
     <!-- Key Levels -->
@@ -571,7 +648,7 @@ let lastPrice   = null;
 let indicators  = {};
 let ind = {
   ma20:true, ma50:true, ma200:false, ema9:false,
-  bb:false, vwap:false, volume:true, rsi:true, macd:false, pred:true
+  bb:false, vwap:false, volume:true, rsi:true, macd:false, pred:true, tradeLines:true
 };
 // Chart view state
 let viewStart = 0;   // index of first visible candle
@@ -808,6 +885,7 @@ async function loadData() {
     updateQuoteBar();
     drawChart();
     updateSignalCard();
+    updateTradeSetup();
     updateKeyLevels();
     updatePrediction();
     updateStats();
@@ -1129,6 +1207,117 @@ function updateKeyLevels() {
 }
 
 // ═══════════════════════════════════════
+//  TRADE SETUP
+// ═══════════════════════════════════════
+function calcTradeSetup() {
+  const {sr, pred, atrs, closes} = indicators;
+  const cur   = closes[closes.length-1];
+  const atr   = atrs.filter(x=>x!=null).pop()||0;
+  const isLong = pred.bias >= 0;
+
+  // Entry: current price (or slightly better zone)
+  const entry = cur;
+
+  let sl, tp1, tp2, tp3, slReason, tp1Reason, tp2Reason, tp3Reason;
+
+  if(isLong) {
+    // Stop loss: below nearest support or 1.2 ATR below entry
+    const bestSup = sr.support.filter(v=>v<cur*0.999).sort((a,b)=>b-a)[0];
+    sl = bestSup ? Math.min(bestSup - atr*0.3, cur - atr*1.2) : cur - atr*1.2;
+    slReason = bestSup ? 'Below S1 support' : '1.2× ATR below entry';
+    // Take profits: at resistance levels, then ATR extensions
+    const resLevels = sr.resistance.filter(v=>v>cur*1.002).sort((a,b)=>a-b);
+    tp1 = resLevels[0] || cur + atr*1.5;
+    tp1Reason = resLevels[0] ? 'R1 resistance' : '1.5× ATR target';
+    tp2 = resLevels[1] || cur + atr*2.5;
+    tp2Reason = resLevels[1] ? 'R2 resistance' : '2.5× ATR target';
+    tp3 = resLevels[2] || cur + atr*4.0;
+    tp3Reason = resLevels[2] ? 'R3 resistance' : '4× ATR extension';
+  } else {
+    // Short setup (price expected to fall)
+    const bestRes = sr.resistance.filter(v=>v>cur*1.001).sort((a,b)=>a-b)[0];
+    sl = bestRes ? Math.max(bestRes + atr*0.3, cur + atr*1.2) : cur + atr*1.2;
+    slReason = bestRes ? 'Above R1 resistance' : '1.2× ATR above entry';
+    const supLevels = sr.support.filter(v=>v<cur*0.999).sort((a,b)=>b-a);
+    tp1 = supLevels[0] || cur - atr*1.5;
+    tp1Reason = supLevels[0] ? 'S1 support' : '1.5× ATR target';
+    tp2 = supLevels[1] || cur - atr*2.5;
+    tp2Reason = supLevels[1] ? 'S2 support' : '2.5× ATR target';
+    tp3 = supLevels[2] || cur - atr*4.0;
+    tp3Reason = supLevels[2] ? 'S3 support' : '4× ATR extension';
+  }
+
+  const risk    = Math.abs(entry - sl);
+  const reward1 = Math.abs(tp1   - entry);
+  const rr1     = reward1 / risk;
+  // Break-even win rate = 1 / (1 + R/R)
+  const winNeeded = (1 / (1 + rr1) * 100);
+
+  return {isLong, entry, sl, tp1, tp2, tp3, risk, reward1, rr1, winNeeded,
+          slReason, tp1Reason, tp2Reason, tp3Reason};
+}
+
+function updateTradeSetup() {
+  const ts = calcTradeSetup();
+  indicators.tradeSetup = ts;
+
+  const {isLong, entry, sl, tp1, tp2, tp3, risk, reward1, rr1, winNeeded,
+         slReason, tp1Reason, tp2Reason, tp3Reason} = ts;
+
+  document.getElementById('tradeDirLabel').textContent = isLong ? '▲ LONG' : '▼ SHORT';
+  document.getElementById('tradeDirLabel').className = 'trade-dir-label ' + (isLong?'long':'short');
+  document.getElementById('tradeDirSub').innerHTML =
+    `Based on RSI + MACD + S/R<br>Bias score: ${(indicators.pred.bias*100).toFixed(0)}%`;
+  document.getElementById('tradeUpdated').textContent = new Date().toLocaleTimeString('en-US',{hour12:false});
+
+  const pct = (v,ref,dir) => {
+    const p = (v-ref)/ref*100;
+    const sign = p>=0?'+':'';
+    return `<span class="${p>=0?'up':'dn'}">${sign}${p.toFixed(2)}%</span>`;
+  };
+
+  const entryPct  = '—';
+  const slPct     = `<span class="dn">${((sl-entry)/entry*100).toFixed(2)}%</span>`;
+  const tp1Pct    = `<span class="up">+${((tp1-entry)/entry*100).toFixed(2)}%</span>`;
+  const tp2Pct    = `<span class="up">+${((tp2-entry)/entry*100).toFixed(2)}%</span>`;
+  const tp3Pct    = `<span class="up">+${((tp3-entry)/entry*100).toFixed(2)}%</span>`;
+
+  document.getElementById('tradeLevels').innerHTML=`
+    <div class="tl-row">
+      <span class="tl-badge entry">Entry</span>
+      <span class="tl-price">$${entry.toFixed(2)}</span>
+      <div class="tl-detail"><div class="tl-pct" style="color:var(--accent)">Current Price</div><div class="tl-desc">Enter here or wait for pullback</div></div>
+    </div>
+    <div class="tl-row">
+      <span class="tl-badge sl">Stop</span>
+      <span class="tl-price">$${sl.toFixed(2)}</span>
+      <div class="tl-detail"><div class="tl-pct">${slPct}</div><div class="tl-desc">${slReason} — Exit if wrong</div></div>
+    </div>
+    <div class="tl-row">
+      <span class="tl-badge tp1">TP 1</span>
+      <span class="tl-price">$${tp1.toFixed(2)}</span>
+      <div class="tl-detail"><div class="tl-pct">${tp1Pct}</div><div class="tl-desc">${tp1Reason} — Take partial profits</div></div>
+    </div>
+    <div class="tl-row">
+      <span class="tl-badge tp2">TP 2</span>
+      <span class="tl-price">$${tp2.toFixed(2)}</span>
+      <div class="tl-detail"><div class="tl-pct">${tp2Pct}</div><div class="tl-desc">${tp2Reason} — Scale out more</div></div>
+    </div>
+    <div class="tl-row">
+      <span class="tl-badge tp3">TP 3</span>
+      <span class="tl-price">$${tp3.toFixed(2)}</span>
+      <div class="tl-detail"><div class="tl-pct">${tp3Pct}</div><div class="tl-desc">${tp3Reason} — Full exit target</div></div>
+    </div>`;
+
+  document.getElementById('tradeRR').style.display='flex';
+  document.getElementById('rr_risk').textContent   = '-$'+risk.toFixed(2);
+  document.getElementById('rr_ratio').textContent  = '1 : '+rr1.toFixed(1);
+  document.getElementById('rr_ratio').className    = 'rr-value '+(rr1>=2?'up':rr1>=1?'neut':'dn');
+  document.getElementById('rr_reward').textContent = '+$'+reward1.toFixed(2);
+  document.getElementById('rr_winpct').textContent = winNeeded.toFixed(0)+'%';
+}
+
+// ═══════════════════════════════════════
 //  PREDICTION
 // ═══════════════════════════════════════
 function updatePrediction() {
@@ -1317,6 +1506,12 @@ function drawChart() {
   const nearSup = sr.support.filter(v=>v>pMin*0.99&&v<pMax);
   if(nearRes.length) pMax = Math.max(pMax, Math.max(...nearRes)*1.002);
   if(nearSup.length) pMin = Math.min(pMin, Math.min(...nearSup)*0.998);
+  // Include trade setup levels in view
+  if(ind.tradeLines && indicators.tradeSetup) {
+    const ts = indicators.tradeSetup;
+    pMax = Math.max(pMax, ts.tp1, ts.tp2, ts.sl)*1.002;
+    pMin = Math.min(pMin, ts.sl, ts.tp1)*0.998;
+  }
 
   const pRange = pMax-pMin||1;
   const pY  = (p) => pp.y + pp.h - ((p-pMin)/pRange)*(pp.h-PAD_B) - PAD_B/2;
@@ -1443,6 +1638,39 @@ function drawChart() {
     const v=m.arr.slice(viewStart,viewStart+viewCount).filter(x=>x!=null).pop();
     if(v!=null){ctx.fillStyle=m.color;ctx.fillText(m.label,W-PAD_R+2,pY(v)+4);}
   });
+
+  // ── Trade Setup Lines ──
+  if(ind.tradeLines && indicators.tradeSetup) {
+    const ts = indicators.tradeSetup;
+    const levels = [
+      {price:ts.entry, color:'rgba(88,166,255,0.9)',  dash:[],    label:'ENTRY  $'+ts.entry.toFixed(2),  labelColor:'rgba(88,166,255,0.9)'},
+      {price:ts.sl,    color:'rgba(248,81,73,0.85)',  dash:[4,3], label:'STOP   $'+ts.sl.toFixed(2),    labelColor:'rgba(248,81,73,0.85)'},
+      {price:ts.tp1,   color:'rgba(63,185,80,0.85)',  dash:[4,3], label:'TP1    $'+ts.tp1.toFixed(2),   labelColor:'rgba(63,185,80,0.85)'},
+      {price:ts.tp2,   color:'rgba(63,185,80,0.55)',  dash:[4,3], label:'TP2    $'+ts.tp2.toFixed(2),   labelColor:'rgba(63,185,80,0.55)'},
+      {price:ts.tp3,   color:'rgba(63,185,80,0.30)',  dash:[4,3], label:'TP3    $'+ts.tp3.toFixed(2),   labelColor:'rgba(63,185,80,0.30)'},
+    ];
+    levels.forEach(lv => {
+      const y = pY(lv.price);
+      if(y < pp.y || y > pp.y+pp.h) return;
+      ctx.strokeStyle=lv.color; ctx.lineWidth=lv.dash.length?1:1.5;
+      ctx.setLineDash(lv.dash);
+      ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(W-PAD_R,y); ctx.stroke();
+      ctx.setLineDash([]);
+      // Right-side label pill
+      ctx.fillStyle=lv.labelColor;
+      ctx.font='bold 9px "JetBrains Mono"';
+      ctx.textAlign='left';
+      ctx.fillText(lv.label, W-PAD_R+2, y+4);
+    });
+    // Shade risk zone (entry to SL)
+    const eY=pY(ts.entry), slY=pY(ts.sl);
+    ctx.fillStyle='rgba(248,81,73,0.06)';
+    ctx.fillRect(PAD_L, Math.min(eY,slY), W-PAD_L-PAD_R, Math.abs(eY-slY));
+    // Shade reward zone (entry to TP1)
+    const tp1Y=pY(ts.tp1);
+    ctx.fillStyle='rgba(63,185,80,0.05)';
+    ctx.fillRect(PAD_L, Math.min(eY,tp1Y), W-PAD_L-PAD_R, Math.abs(eY-tp1Y));
+  }
 
   // Candles (historical)
   visData.forEach((d,i)=>{
