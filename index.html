@@ -976,7 +976,7 @@ body{
         <div class="panel-title">Trade Setup</div>
         <div style="font-size:10px;color:var(--text3)" id="tradeUpdated">Load data</div>
       </div>
-      <div class="trade-dir" id="tradeDirRow">
+      <div class="trade-dir" id="tradeDirRow" title="Suggested Direction — LONG means the technical signals favor the price going up (buy and profit from a rise). SHORT means signals favor the price going down. This is determined by combining RSI momentum, MACD crossover direction, and whether the price is above or below key support/resistance levels.">
         <div>
           <div class="trade-dir-label" id="tradeDirLabel">—</div>
           <div style="font-size:10px;color:var(--text2);margin-top:2px">Suggested Direction</div>
@@ -987,10 +987,10 @@ body{
         <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Load data to generate setup</div>
       </div>
       <div class="trade-rr" id="tradeRR" style="display:none">
-        <div class="rr-item"><div class="rr-label">Risk $</div><div class="rr-value dn" id="rr_risk">—</div></div>
-        <div class="rr-item"><div class="rr-label">R/R Ratio</div><div class="rr-value" id="rr_ratio">—</div></div>
-        <div class="rr-item"><div class="rr-label">TP1 Reward $</div><div class="rr-value up" id="rr_reward">—</div></div>
-        <div class="rr-item"><div class="rr-label">Win needed</div><div class="rr-value neut" id="rr_winpct">—</div></div>
+        <div class="rr-item" title="Risk $ — The dollar amount you would lose per share if the stock hits your Stop Loss. Multiply this by your share count to know your total dollar risk on the trade."><div class="rr-label">Risk $</div><div class="rr-value dn" id="rr_risk">—</div></div>
+        <div class="rr-item" title="Risk/Reward Ratio — Compares your potential loss (Entry → Stop) to your potential gain (Entry → TP1). A ratio of 1:2 means you risk $1 to make $2. Look for at least 1:2 — ideally 1:3 or better."><div class="rr-label">R/R Ratio</div><div class="rr-value" id="rr_ratio">—</div></div>
+        <div class="rr-item" title="TP1 Reward $ — The dollar gain per share if the stock reaches Take Profit 1. Multiply by your share count for total potential profit at the first target."><div class="rr-label">TP1 Reward $</div><div class="rr-value up" id="rr_reward">—</div></div>
+        <div class="rr-item" title="Win Rate Needed — The minimum percentage of trades you need to win to break even with this Risk/Reward ratio. Example: a 1:2 R/R only requires a 33% win rate to be profitable long-term."><div class="rr-label">Win needed</div><div class="rr-value neut" id="rr_winpct">—</div></div>
       </div>
       <div class="trade-disclaimer">⚠ Auto-calculated from ATR + S/R. Not financial advice. Always use your own judgement.</div>
     </div>
@@ -1911,27 +1911,27 @@ function updateTradeSetup() {
   const tp3Pct    = `<span class="up">+${((tp3-entry)/entry*100).toFixed(2)}%</span>`;
 
   document.getElementById('tradeLevels').innerHTML=`
-    <div class="tl-row">
+    <div class="tl-row" title="Entry — The suggested price to open the trade. Based on the current market price. You can enter immediately or wait for a small pullback toward this level for a better price.">
       <span class="tl-badge entry">Entry</span>
       <span class="tl-price">$${entry.toFixed(2)}</span>
       <div class="tl-detail"><div class="tl-pct" style="color:var(--accent)">Current Price</div><div class="tl-desc">Enter here or wait for pullback</div></div>
     </div>
-    <div class="tl-row">
+    <div class="tl-row" title="Stop Loss — The price at which you should exit to cut your loss. If the stock hits this level, the trade idea is wrong. Calculated using ATR (Average True Range), which measures the stock's normal daily price movement. Never risk more than you can afford to lose.">
       <span class="tl-badge sl">Stop</span>
       <span class="tl-price">$${sl.toFixed(2)}</span>
       <div class="tl-detail"><div class="tl-pct">${slPct}</div><div class="tl-desc">${slReason} — Exit if wrong</div></div>
     </div>
-    <div class="tl-row">
+    <div class="tl-row" title="Take Profit 1 — First target to lock in gains. This is the conservative target near the next resistance level. Consider selling 25–50% of your position here to secure profits while letting the rest run.">
       <span class="tl-badge tp1">TP 1</span>
       <span class="tl-price">$${tp1.toFixed(2)}</span>
       <div class="tl-detail"><div class="tl-pct">${tp1Pct}</div><div class="tl-desc">${tp1Reason} — Take partial profits</div></div>
     </div>
-    <div class="tl-row">
+    <div class="tl-row" title="Take Profit 2 — Second target at a higher resistance level. After hitting TP1, move your stop loss to breakeven (your entry price) so you can't lose money on the remaining shares. Sell another portion here.">
       <span class="tl-badge tp2">TP 2</span>
       <span class="tl-price">$${tp2.toFixed(2)}</span>
       <div class="tl-detail"><div class="tl-pct">${tp2Pct}</div><div class="tl-desc">${tp2Reason} — Scale out more</div></div>
     </div>
-    <div class="tl-row">
+    <div class="tl-row" title="Take Profit 3 — The ambitious full target based on 4× ATR extension. Only hold for TP3 if the trade has strong momentum and you've already secured profits at TP1 and TP2. This is the maximum upside projection.">
       <span class="tl-badge tp3">TP 3</span>
       <span class="tl-price">$${tp3.toFixed(2)}</span>
       <div class="tl-detail"><div class="tl-pct">${tp3Pct}</div><div class="tl-desc">${tp3Reason} — Full exit target</div></div>
