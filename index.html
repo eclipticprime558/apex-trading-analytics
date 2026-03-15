@@ -598,30 +598,6 @@ body{
 </head>
 <body>
 
-<!-- API Key Modal -->
-<div class="modal-backdrop" id="keyModal" style="display:none">
-  <div class="modal-box">
-    <div class="modal-title">🔑 Connect Live Market Data</div>
-    <div class="modal-sub">
-      APEX uses <b>Finnhub.io</b> for reliable, real-time stock data — all US stocks, ETFs, crypto, and more.
-      A free API key takes 2 minutes to get and gives you 60 requests/minute at no cost.
-    </div>
-    <div class="modal-steps">
-      1. Go to <a href="https://finnhub.io/register" target="_blank"><b>finnhub.io/register</b></a> and sign up free (no credit card)<br>
-      2. After login, your API key is shown on the <b>Dashboard</b><br>
-      3. Copy it and paste it below — it saves in your browser
-    </div>
-    <div class="modal-input-row">
-      <input class="modal-input" id="keyInput" type="text" placeholder="Paste your Finnhub API key here...">
-      <button class="btn-load" onclick="saveApiKey()">Save</button>
-    </div>
-    <div class="modal-err" id="keyErr"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div class="modal-note">Your key is stored locally in your browser and never sent anywhere except Finnhub.</div>
-      <button class="btn-outline" onclick="closeKeyModal()" style="font-size:11px;padding:6px 12px">Skip for now</button>
-    </div>
-  </div>
-</div>
 
 <div id="loading"><div id="loadingBar"></div></div>
 
@@ -652,10 +628,6 @@ body{
   </select>
   <button class="btn-load" onclick="loadData()">▶ Load</button>
   <button class="btn-outline" onclick="exportCSV()">↓ Export</button>
-  <div class="key-indicator unset" id="keyIndicator" onclick="openKeyModal()" title="Click to set API key">
-    <span id="keyIndicatorDot">⬤</span>
-    <span id="keyIndicatorText">NO API KEY</span>
-  </div>
 
   <div class="hdr-right">
     <div class="market-badge closed" id="marketBadge">
@@ -914,7 +886,7 @@ function startRefreshTimer() {
 }
 
 async function refreshLivePrice() {
-  if(!rawData.length||!getKey()) return;
+  if(!rawData.length) return;
   try {
     const json = await finnhubFetch(`/quote?symbol=${encodeURIComponent(ticker)}`);
     const newPrice = json?.c;
@@ -942,57 +914,11 @@ async function refreshLivePrice() {
 }
 
 // ═══════════════════════════════════════
-//  API KEY MANAGEMENT
+//  FINNHUB — routed through server proxy
+//  Key stored as FINNHUB_KEY env var on Vercel
 // ═══════════════════════════════════════
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 
-function getKey() { return localStorage.getItem('apex_finnhub_key')||''; }
-
-function updateKeyIndicator() {
-  const k = getKey();
-  const ind = document.getElementById('keyIndicator');
-  const txt = document.getElementById('keyIndicatorText');
-  if(k) {
-    ind.className='key-indicator set';
-    txt.textContent='LIVE DATA ●';
-  } else {
-    ind.className='key-indicator unset';
-    txt.textContent='NO API KEY';
-  }
-}
-
-function openKeyModal() {
-  document.getElementById('keyModal').style.display='flex';
-  const k=getKey();
-  if(k) document.getElementById('keyInput').value=k;
-  document.getElementById('keyErr').textContent='';
-}
-
-function closeKeyModal() {
-  document.getElementById('keyModal').style.display='none';
-}
-
-async function saveApiKey() {
-  const k = document.getElementById('keyInput').value.trim();
-  document.getElementById('keyErr').textContent='';
-  if(!k){document.getElementById('keyErr').textContent='Please enter your API key.';return;}
-  // Quick validation — try a simple quote
-  try {
-    document.getElementById('keyErr').textContent='Validating...';
-    const r = await fetch(`${FINNHUB_BASE}/quote?symbol=AAPL&token=${k}`);
-    if(!r.ok) throw new Error('Invalid key (HTTP '+r.status+')');
-    const j = await r.json();
-    if(!j||j.c===undefined) throw new Error('Key rejected by Finnhub');
-    localStorage.setItem('apex_finnhub_key',k);
-    updateKeyIndicator();
-    closeKeyModal();
-    loadData();
-  } catch(e) {
-    document.getElementById('keyErr').textContent = '✗ '+e.message+' — check your key and try again.';
-  }
-}
-
-// ─── Finnhub API helpers ───
 // Map app interval → Finnhub resolution
 function toFinnhubRes(interval) {
   return {
@@ -1009,11 +935,9 @@ function rangeToSeconds(range) {
 }
 
 async function finnhubFetch(path) {
-  const k = getKey();
-  if(!k) throw new Error('NO_KEY');
-  const r = await fetch(`${FINNHUB_BASE}${path}&token=${k}`);
-  if(r.status===401||r.status===403) throw new Error('API key invalid or expired. Click the key indicator to update it.');
-  if(r.status===429) throw new Error('Rate limit hit — Finnhub free tier allows 60 requests/min. Wait a moment and retry.');
+  // Key is injected server-side by api/proxy.js from FINNHUB_KEY env var
+  const r = await fetch('/api/proxy?url=' + encodeURIComponent(`${FINNHUB_BASE}${path}`));
+  if(r.status===429) throw new Error('Rate limit hit — wait a moment and retry.');
   if(!r.ok) throw new Error('Finnhub error: HTTP '+r.status);
   return r.json();
 }
@@ -1089,9 +1013,9 @@ async function fetchSuggestions(q) {
     }
   } catch(e){ /* fall through to Finnhub or static list */ }
 
-  // Fallback: Finnhub search if key available
-  if(getKey()) {
-    try {
+  // Fallback: Finnhub search
+  try {
+    {
       const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
       const results = (json?.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETF'||r.type==='ADR'||r.type==='Crypto');
       if(results.length) {
@@ -1186,9 +1110,9 @@ async function loadData() {
   try {
     let source = 'Yahoo Finance';
 
-    // ── Try Finnhub first if key is set ──
-    if(getKey()) {
-      try {
+    // ── Try Finnhub first ──
+    try {
+      {
         const res    = toFinnhubRes(interval);
         const toTs   = Math.floor(Date.now()/1000);
         const fromTs = toTs - rangeToSeconds(range);
@@ -2444,12 +2368,7 @@ function loadPickStock(sym) {
 window.addEventListener('load',()=>{
   document.getElementById('loading').style.display='none';
   setupChartEvents();
-  updateKeyIndicator();
-  if(!getKey()) {
-    openKeyModal();
-  } else {
-    loadData();
-  }
+  loadData();
 });
 window.addEventListener('resize',()=>{if(rawData.length)drawChart();});
 </script>
