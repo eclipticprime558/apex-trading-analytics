@@ -554,6 +554,48 @@ body{
 }
 .picks-refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
 
+/* ── Score Tooltip ── */
+#scoreTooltip{
+  position:fixed;z-index:9998;pointer-events:none;
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:8px;padding:14px 16px;width:260px;
+  box-shadow:0 12px 40px rgba(0,0,0,.6);
+  display:none;
+}
+.stt-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+.stt-sym{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;}
+.stt-verdict{font-size:11px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:4px;}
+.stt-verdict.buy{background:rgba(63,185,80,.2);color:var(--green);}
+.stt-verdict.hold{background:rgba(210,153,34,.2);color:var(--yellow);}
+.stt-verdict.sell{background:rgba(248,81,73,.2);color:var(--red);}
+.stt-factor{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:5px 0;border-bottom:1px solid rgba(48,54,61,.5);font-size:11px;
+}
+.stt-factor:last-of-type{border-bottom:none;}
+.stt-icon{font-size:13px;min-width:16px;}
+.stt-desc{flex:1;color:var(--text2);line-height:1.4;}
+.stt-pts{
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;
+  min-width:30px;text-align:right;
+}
+.stt-pts.pos{color:var(--green);}
+.stt-pts.neg{color:var(--red);}
+.stt-pts.neu{color:var(--text3);}
+.stt-total{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--border);
+  font-size:10px;color:var(--text3);
+}
+.stt-total b{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);}
+.stt-source{
+  margin-top:8px;padding-top:6px;border-top:1px solid var(--border);
+  font-size:9px;color:var(--text3);line-height:1.5;
+}
+
 /* API Key Modal */
 .modal-backdrop{
   position:fixed;inset:0;background:rgba(0,0,0,0.7);
@@ -600,6 +642,7 @@ body{
 
 
 <div id="loading"><div id="loadingBar"></div></div>
+<div id="scoreTooltip"></div>
 
 <!-- Header -->
 <header class="header">
@@ -2231,6 +2274,8 @@ function switchView(view, el) {
 // ═══════════════════════════════════════
 //  MARKET PICKS — DATA + RENDERING
 // ═══════════════════════════════════════
+const picksQuoteCache = {};  // cache quotes so tooltip can access them by symbol
+
 const WATCHLISTS = {
   ai: ['NVDA','META','MSFT','AAPL','GOOGL','AMZN','TSLA','AMD','CRM','NFLX','UBER','SHOP'],
   early: ['PLTR','SOFI','RIVN','IONQ','SOUN','BBAI','MARA','SMCI','RGTI','ACHR','RKLB','LUNR'],
@@ -2293,6 +2338,7 @@ async function loadPicks() {
   results.forEach((r, i) => {
     if(r.status === 'fulfilled' && r.value) {
       quotes[allSyms[i]] = r.value;
+      picksQuoteCache[allSyms[i]] = r.value;  // cache for tooltip
     } else {
       failCount++;
       dbg(`${allSyms[i]} failed: ${r.reason?.message||r.status}`,'err');
@@ -2369,6 +2415,96 @@ function calcQuickScore(q) {
 function pickSig(s)  { return s >= 65 ? 'BUY' : s >= 45 ? 'HOLD' : 'SELL'; }
 function pickCls(s)  { return s >= 65 ? 'buy'  : s >= 45 ? 'hold'  : 'sell'; }
 
+// Build a human-readable score breakdown for the tooltip
+function buildScoreExplain(sym, q, score) {
+  const factors = [];
+
+  // Factor 1: Daily momentum
+  const chg = q.regularMarketChangePercent || 0;
+  let momPts = chg > 4 ? 18 : chg > 2 ? 11 : chg > 0 ? 4 : chg < -4 ? -18 : chg < -2 ? -11 : -4;
+  const momDir = chg >= 0 ? 'up' : 'down';
+  factors.push({
+    icon: chg >= 0 ? '📈' : '📉',
+    label: 'Daily Momentum',
+    detail: `Price is ${momDir} ${Math.abs(chg).toFixed(2)}% today`,
+    pts: momPts,
+  });
+
+  // Factor 2: 52-week position
+  const hi = q.fiftyTwoWeekHigh, lo = q.fiftyTwoWeekLow, p = q.regularMarketPrice;
+  let posPts = 0, posDetail = 'Middle of 52W range — neutral';
+  if(hi && lo && hi !== lo) {
+    const pos = (p - lo) / (hi - lo);
+    const pct = Math.round(pos * 100);
+    if     (pos < 0.20) { posPts = 14; posDetail = `Bottom ${pct}% of 52W range — deep discount, potential accumulation zone`; }
+    else if(pos < 0.35) { posPts = 8;  posDetail = `Lower ${pct}% of 52W range — value territory, buyers often step in here`; }
+    else if(pos > 0.92) { posPts = 10; posDetail = `Top ${pct}% of 52W range — near highs, strong uptrend momentum`; }
+    else if(pos > 0.75) { posPts = 5;  posDetail = `Upper ${pct}% of 52W range — positive trend, bullish territory`; }
+    else                { posPts = 0;  posDetail = `${pct}% of 52W range — mid-range, no strong directional signal`; }
+  }
+  factors.push({ icon: '📍', label: '52-Week Position', detail: posDetail, pts: posPts });
+
+  // Factor 3: Volume spike
+  const vol = q.regularMarketVolume, avg = q.averageDailyVolume3Month;
+  let volPts = 0, volDetail = 'Volume data unavailable';
+  if(vol && avg && avg > 0) {
+    const r = vol / avg;
+    if     (r > 3.0) { volPts = 16; volDetail = `${r.toFixed(1)}x average volume — very unusual activity, big players moving`; }
+    else if(r > 2.0) { volPts = 10; volDetail = `${r.toFixed(1)}x average volume — elevated interest, above-normal trading`; }
+    else if(r > 1.5) { volPts = 5;  volDetail = `${r.toFixed(1)}x average volume — slightly above normal, mild interest`; }
+    else if(r < 0.4) { volPts = -6; volDetail = `${r.toFixed(1)}x average volume — very low activity, weak conviction`; }
+    else             { volPts = 0;  volDetail = `${r.toFixed(1)}x average volume — normal trading activity`; }
+  }
+  factors.push({ icon: '🔥', label: 'Volume Activity', detail: volDetail, pts: volPts });
+
+  return { sym, score, factors };
+}
+
+// Tooltip show/hide
+const _tt = { el: null, visible: false };
+function showScoreTip(e, sym, q, score) {
+  const tip = document.getElementById('scoreTooltip');
+  const { factors } = buildScoreExplain(sym, q, score);
+  const cls = pickCls(score), sig = pickSig(score);
+  tip.innerHTML = `
+    <div class="stt-header">
+      <span class="stt-sym">${sym}</span>
+      <span class="stt-verdict ${cls}">${sig} · ${score}/100</span>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">Why this score:</div>
+    ${factors.map(f => {
+      const ptsCls = f.pts > 0 ? 'pos' : f.pts < 0 ? 'neg' : 'neu';
+      const ptsStr = f.pts > 0 ? '+'+f.pts : f.pts === 0 ? '±0' : f.pts;
+      return `<div class="stt-factor">
+        <span class="stt-icon">${f.icon}</span>
+        <span class="stt-desc"><b style="color:var(--text)">${f.label}</b><br>${f.detail}</span>
+        <span class="stt-pts ${ptsCls}">${ptsStr}</span>
+      </div>`;
+    }).join('')}
+    <div class="stt-total">
+      <span>Base 50 + factors</span>
+      <b>${score}</b>
+    </div>
+    <div class="stt-source">
+      📡 Data: Yahoo Finance (live via server proxy)<br>
+      ⚠ Technical signals only — not financial advice
+    </div>`;
+  positionTip(e, tip);
+  tip.style.display = 'block';
+}
+function positionTip(e, tip) {
+  const x = e.clientX + 12, y = e.clientY - 10;
+  const maxX = window.innerWidth  - 276;
+  const maxY = window.innerHeight - (tip.offsetHeight || 280);
+  tip.style.left = Math.min(x, maxX) + 'px';
+  tip.style.top  = Math.min(y, maxY) + 'px';
+}
+function hideTip() { document.getElementById('scoreTooltip').style.display='none'; }
+document.addEventListener('mousemove', e => {
+  const tip = document.getElementById('scoreTooltip');
+  if(tip.style.display === 'block') positionTip(e, tip);
+});
+
 function renderPicksCol(colId, tickers, quotes) {
   const col = document.getElementById(colId);
   const scored = tickers
@@ -2403,7 +2539,10 @@ function renderPicksCol(colId, tickers, quotes) {
         <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}</div>
       </div>
       <div class="pick-score-wrap">
-        <div class="pick-score ${pickCls(score)}">${score}</div>
+        <div class="pick-score ${pickCls(score)}"
+             onmouseenter="showScoreTip(event,'${sym}',picksQuoteCache['${sym}'],${score})"
+             onmouseleave="hideTip()"
+             title="Hover for score breakdown">${score}</div>
         <div class="pick-sig">${pickSig(score)}</div>
       </div>
     </div>`;
