@@ -842,6 +842,7 @@ body{
 <div class="view-nav">
   <button class="view-btn active" id="viewBtnChart" onclick="switchView('chart',this)">◈ Chart</button>
   <button class="view-btn" id="viewBtnPicks" onclick="switchView('picks',this)">⬡ Market Picks</button>
+  <button class="view-btn" id="viewBtnIntel" onclick="switchToIntel()">📡 Market Intel</button>
 </div>
 
 <!-- Market Picks View -->
@@ -877,7 +878,7 @@ body{
   <div class="picks-footer" id="picksFooter">⚠ Scores are technical momentum signals only — not financial advice. Always do your own research.</div>
 
   <!-- Market Intelligence -->
-  <div class="intel-section">
+  <div class="intel-section" id="intelSection">
     <div class="intel-header">
       <div class="intel-title">📡 Market Intelligence</div>
       <div class="intel-sub">Breaking news · Earnings calendar · Catalysts to watch</div>
@@ -1061,66 +1062,82 @@ body{
     <!-- Quick Start -->
     <div class="help-section">
       <div class="help-section-title">🚀 Quick Start</div>
-      <div class="help-item"><span class="help-icon">1️⃣</span><div class="help-text">The site opens on <b>Market Picks</b> — a live-scored list of stocks worth watching right now.</div></div>
-      <div class="help-item"><span class="help-icon">2️⃣</span><div class="help-text">Click any stock card to jump straight to its <b>full chart</b> with all indicators.</div></div>
-      <div class="help-item"><span class="help-icon">3️⃣</span><div class="help-text">Or use the <b>search bar</b> at the top — type any ticker (AAPL) or company name (Apple) and press Enter.</div></div>
-      <div class="help-item"><span class="help-icon">4️⃣</span><div class="help-text">Switch between <b>◈ Chart</b> and <b>⬡ Market Picks</b> using the nav bar below the header.</div></div>
+      <div class="help-item"><span class="help-icon">1️⃣</span><div class="help-text">The site opens on <b>Market Picks</b> — a live-scored watchlist of stocks ranked by technical strength right now.</div></div>
+      <div class="help-item"><span class="help-icon">2️⃣</span><div class="help-text">Click any stock card to jump straight to its <b>full chart</b> with all indicators. Hit the browser <b>Back button</b> to return to Market Picks.</div></div>
+      <div class="help-item"><span class="help-icon">3️⃣</span><div class="help-text">Use the <b>search bar</b> at the top — type any ticker (AAPL) or company name (Apple) and press Enter.</div></div>
+      <div class="help-item"><span class="help-icon">4️⃣</span><div class="help-text">The <b>Market Pulse bar</b> (SPY / QQQ / DIA / IWM / VIX) is clickable — tap any index to open its chart.</div></div>
     </div>
 
     <!-- Market Picks -->
     <div class="help-section">
       <div class="help-section-title">⬡ Market Picks</div>
-      <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>Score (0–100)</b> — each stock gets a momentum score calculated from three live data points pulled from Yahoo Finance.</div></div>
+      <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>Score (0–100)</b> — each stock is ranked using a multi-factor technical engine (RSI, MACD, moving averages, momentum, volume, Bollinger Bands) run on one full year of daily candles.</div></div>
       <div class="help-item"><span class="help-icon">🎯</span><div class="help-text">
-        <span class="help-chip chip-buy">BUY 65+</span> strong signal &nbsp;
-        <span class="help-chip chip-hold">HOLD 45–64</span> mixed &nbsp;
-        <span class="help-chip chip-sell">SELL 0–44</span> weak
+        <span class="help-chip chip-buy">STRONG BUY 72+</span>&nbsp;
+        <span class="help-chip chip-buy">BUY 58–71</span>&nbsp;
+        <span class="help-chip chip-hold">HOLD 42–57</span>&nbsp;
+        <span class="help-chip chip-sell">SELL 28–41</span>&nbsp;
+        <span class="help-chip chip-sell">STRONG SELL &lt;28</span>
       </div></div>
-      <div class="help-item"><span class="help-icon">💡</span><div class="help-text"><b>Hover the score circle</b> to see exactly why — which factors drove the score up or down, in plain English.</div></div>
-      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>AI Top Picks</b> — large &amp; mid cap stocks sorted by score. Highest conviction opportunities at the top.</div></div>
-      <div class="help-item"><span class="help-icon">◎</span><div class="help-text"><b>Early Entry Radar</b> — smaller, cheaper stocks showing unusual volume or momentum. Higher risk, higher potential reward. Good for spotting moves before they're mainstream.</div></div>
-      <div class="help-item"><span class="help-icon">▦</span><div class="help-text"><b>Sector Trends</b> — ETF scores showing which sectors of the market (tech, energy, finance, etc.) have the most momentum. Useful for understanding where money is rotating.</div></div>
-      <div class="help-item"><span class="help-icon">↻</span><div class="help-text">Data <b>auto-refreshes every 90 seconds</b>. Click Refresh to update manually.</div></div>
+      <div class="help-item"><span class="help-icon">💡</span><div class="help-text"><b>Hover the score circle</b> to see exactly why — RSI level, MACD crossover status, trend relative to MA20/MA50, 5-day momentum, volume spike, and Bollinger band position, all explained in plain English.</div></div>
+      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>AI Top Picks</b> — 20 large &amp; mid cap stocks sorted by score. Highest conviction opportunities listed first.</div></div>
+      <div class="help-item"><span class="help-icon">◎</span><div class="help-text"><b>Early Entry Radar</b> — 20 smaller, cheaper stocks showing unusual momentum (PLTR, IONQ, RKLB, etc.). Higher risk, higher potential. Good for spotting moves early.</div></div>
+      <div class="help-item"><span class="help-icon">▦</span><div class="help-text"><b>Sector Trends</b> — 20 ETF scores showing where market money is rotating (XLK, XLF, XLE, GLD, TLT, ARKK, and more).</div></div>
+      <div class="help-item"><span class="help-icon">↻</span><div class="help-text">Data <b>auto-refreshes every 90 seconds</b> when the market is open. Use the Refresh button to update manually anytime.</div></div>
     </div>
 
     <!-- Score Breakdown -->
     <div class="help-section">
       <div class="help-section-title">🧠 How Scores Are Calculated</div>
-      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>Daily Momentum (±18 pts)</b> — How much the price moved today. Up 4%+ = +18 pts. Down 4%+ = −18 pts. Captures short-term direction.</div></div>
-      <div class="help-item"><span class="help-icon">📍</span><div class="help-text"><b>52-Week Position (+14 pts)</b> — Where the price sits in its annual range. Near the 52W low = potential accumulation zone (+14). Near 52W high = strong uptrend (+10).</div></div>
-      <div class="help-item"><span class="help-icon">🔥</span><div class="help-text"><b>Volume Activity (+16 pts)</b> — Today's volume vs the 90-day average. 3×+ normal volume = big players moving = +16 pts. Low volume = weak conviction = −6 pts.</div></div>
-      <div class="help-item"><span class="help-icon">📡</span><div class="help-text">All data is fetched live from <b>Yahoo Finance</b> through a secure server proxy. Prices update in real time.</div></div>
+      <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>RSI (±18 pts)</b> — Relative Strength Index. RSI below 30 (oversold bounce) or above 70 (strong momentum) both score well. Extreme RSI in the right direction = max points.</div></div>
+      <div class="help-item"><span class="help-icon">⚡</span><div class="help-text"><b>MACD (±26 pts)</b> — Most heavily weighted factor. A recent bullish crossover (MACD line crossing above signal) adds up to +18 pts. MACD above zero adds another +8 pts.</div></div>
+      <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>Moving Averages (±16 pts)</b> — Price above MA20 = +8 pts. Price above MA50 = +8 pts. Confirms the stock is in an uptrend on multiple timeframes.</div></div>
+      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>5-Day Momentum (±10 pts)</b> — How much the price has moved over the last 5 trading days. Captures short-term directional conviction.</div></div>
+      <div class="help-item"><span class="help-icon">🔥</span><div class="help-text"><b>Volume Spike (±8 pts)</b> — Today's volume vs 20-day average. 2× normal volume with a rising price = institutions buying = +8 pts. High volume on a down day = −8 pts.</div></div>
+      <div class="help-item"><span class="help-icon">📏</span><div class="help-text"><b>Bollinger Bands (±10 pts)</b> — Price breaking above the upper band signals a strong breakout (+10). Price sitting below the lower band signals oversold conditions (+8 for a potential bounce).</div></div>
+      <div class="help-item"><span class="help-icon">📡</span><div class="help-text">The <b>same scoring engine</b> powers both Market Picks and the Chart view signal card — scores always match.</div></div>
+    </div>
+
+    <!-- Market Intelligence -->
+    <div class="help-section">
+      <div class="help-section-title">📰 Market Intelligence</div>
+      <div class="help-item"><span class="help-icon">📰</span><div class="help-text"><b>Market News</b> — Top financial headlines from Finnhub updated in real time. Click any headline to open the full article.</div></div>
+      <div class="help-item"><span class="help-icon">📅</span><div class="help-text"><b>Earnings Calendar</b> — Upcoming earnings announcements for the next 7 days. Earnings can cause big price swings — know what's coming before it hits.</div></div>
+      <div class="help-item"><span class="help-icon">⚡</span><div class="help-text"><b>Company Catalysts</b> — Recent news for high-momentum names (NVDA, TSLA, AAPL, PLTR, COIN, SMCI). Quick way to check if a score spike has a fundamental reason behind it.</div></div>
+      <div class="help-item"><span class="help-icon">ℹ️</span><div class="help-text">Market Intelligence is available after market hours and on weekends. Scores will cluster near HOLD when markets are closed (0% daily change = neutral momentum).</div></div>
     </div>
 
     <!-- Chart View -->
     <div class="help-section">
       <div class="help-section-title">◈ Chart View</div>
-      <div class="help-item"><span class="help-icon">🖱️</span><div class="help-text"><b>Scroll</b> to zoom in/out on the chart. <b>Click and drag</b> left/right to pan through history.</div></div>
-      <div class="help-item"><span class="help-icon">🕯️</span><div class="help-text"><b>Green candles</b> = price closed higher than it opened. <b>Red candles</b> = price closed lower. The thin lines (wicks) show the high and low for that period.</div></div>
+      <div class="help-item"><span class="help-icon">🖱️</span><div class="help-text"><b>Scroll</b> to zoom in/out. <b>Click and drag</b> left/right to pan through history.</div></div>
+      <div class="help-item"><span class="help-icon">🔍</span><div class="help-text"><b>Range Zoom</b> — Hold <b>Shift and drag</b> to select a specific date window to zoom into. Or click the <b>⬚ Range Zoom</b> button to enter range-select mode. <b>Double-click</b> or click <b>Reset Zoom</b> to return to the default view.</div></div>
+      <div class="help-item"><span class="help-icon">🕯️</span><div class="help-text"><b>Green candles</b> = closed higher than opened. <b>Red candles</b> = closed lower. The thin wicks show the period high and low.</div></div>
       <div class="help-item"><span class="help-icon">⏱️</span><div class="help-text">Change the <b>time range</b> (1D to 2Y) and <b>interval</b> (5min to Weekly) using the dropdowns in the header.</div></div>
-      <div class="help-item"><span class="help-icon">🔀</span><div class="help-text">Toggle indicators on/off with the buttons in the chart toolbar: <b>MA20, MA50, MA200, EMA9, Bollinger Bands, VWAP, RSI, MACD, Forecast, Trade Lines.</b></div></div>
-      <div class="help-item"><span class="help-icon">🔮</span><div class="help-text"><b>Forecast zone</b> — the 3 faded candles after the last real candle are projected based on ATR (volatility), RSI momentum, and MACD direction. Not a guarantee — a probability range.</div></div>
+      <div class="help-item"><span class="help-icon">🔀</span><div class="help-text"><b>Hover any indicator button</b> (MA20, EMA9, Bollinger, VWAP, RSI, MACD, etc.) to see a plain-English explanation of what it measures before you turn it on.</div></div>
+      <div class="help-item"><span class="help-icon">🔮</span><div class="help-text"><b>Forecast zone</b> — 3 projected candles based on ATR volatility, RSI momentum, and MACD direction. A probability range, not a guarantee.</div></div>
+      <div class="help-item"><span class="help-icon">🔙</span><div class="help-text">The browser <b>Back button</b> returns you to Market Picks. The URL updates automatically (e.g. <code>#chart/AAPL</code>) so you can bookmark or share any chart.</div></div>
     </div>
 
     <!-- Trade Setup -->
     <div class="help-section">
       <div class="help-section-title">📐 Trade Setup Panel</div>
-      <div class="help-item"><span class="help-icon">🎯</span><div class="help-text"><b>Entry</b> — suggested price to enter the trade, based on the current price and nearby support/resistance.</div></div>
-      <div class="help-item"><span class="help-icon">🛑</span><div class="help-text"><b>Stop Loss</b> — the price where you'd exit to limit your loss. Calculated from ATR (average true range) — the normal daily volatility of the stock.</div></div>
+      <div class="help-item"><span class="help-icon">🎯</span><div class="help-text"><b>Entry</b> — suggested price to enter, based on current price and nearby support/resistance levels.</div></div>
+      <div class="help-item"><span class="help-icon">🛑</span><div class="help-text"><b>Stop Loss</b> — the exit price to limit your loss. Calculated from ATR (Average True Range) — the stock's normal daily volatility.</div></div>
       <div class="help-item"><span class="help-icon">✅</span><div class="help-text"><b>TP1 / TP2 / TP3</b> — three take-profit targets at increasing distances. TP1 is conservative, TP3 is ambitious.</div></div>
-      <div class="help-item"><span class="help-icon">⚖️</span><div class="help-text"><b>R/R Ratio</b> — Risk/Reward. A ratio of 1:3 means for every $1 you risk, you could make $3. Generally, look for at least 1:2.</div></div>
-      <div class="help-item"><span class="help-icon">⚠️</span><div class="help-text">These levels are <b>auto-calculated</b> from technical data — not personalized financial advice. Always apply your own judgment.</div></div>
+      <div class="help-item"><span class="help-icon">⚖️</span><div class="help-text"><b>R/R Ratio</b> — Risk/Reward. A 1:3 ratio means for every $1 risked, potential gain is $3. Look for at least 1:2.</div></div>
+      <div class="help-item"><span class="help-icon">⚠️</span><div class="help-text">These levels are <b>auto-calculated</b> from technical data — not personalized financial advice.</div></div>
     </div>
 
     <!-- Indicators -->
     <div class="help-section">
       <div class="help-section-title">📉 Indicators Explained</div>
-      <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>MA20 / MA50 / MA200</b> — Moving averages over 20, 50, and 200 periods. Price above MA = bullish. Price crossing MA from below = buy signal.</div></div>
-      <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>EMA9</b> — Exponential moving average, reacts faster to recent price. Used for short-term trend direction.</div></div>
-      <div class="help-item"><span class="help-icon">📏</span><div class="help-text"><b>Bollinger Bands</b> — Upper and lower bands show volatility. Price near upper band = overbought. Near lower band = oversold.</div></div>
-      <div class="help-item"><span class="help-icon">⚓</span><div class="help-text"><b>VWAP</b> — Volume Weighted Average Price. Institutions use this as a benchmark. Price above VWAP = bullish intraday.</div></div>
-      <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>RSI (14)</b> — Relative Strength Index. Above 70 = overbought (may pull back). Below 30 = oversold (may bounce). 50 = neutral.</div></div>
-      <div class="help-item"><span class="help-icon">⚡</span><div class="help-text"><b>MACD</b> — Momentum indicator. When the MACD line crosses above the signal line = bullish. Below = bearish. Histogram shows strength.</div></div>
+      <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>MA20 / MA50 / MA200</b> — Simple moving averages. Price above MA = uptrend. Price crossing MA from below = potential buy signal. MA200 separates bull and bear market territory.</div></div>
+      <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>EMA9</b> — Exponential moving average, reacts faster to recent price. Good for catching short-term trend changes before MAs catch up.</div></div>
+      <div class="help-item"><span class="help-icon">📏</span><div class="help-text"><b>Bollinger Bands</b> — Volatility bands 2 standard deviations from MA20. Price near upper band = potentially overbought. Near lower band = potentially oversold.</div></div>
+      <div class="help-item"><span class="help-icon">⚓</span><div class="help-text"><b>VWAP</b> — Volume Weighted Average Price. Institutions use this as a fair-value benchmark. Price above VWAP = bullish intraday. Best on 1D and intraday ranges.</div></div>
+      <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>RSI (14)</b> — Relative Strength Index. Above 70 = overbought (watch for pullback). Below 30 = oversold (watch for bounce). 50 = neutral momentum.</div></div>
+      <div class="help-item"><span class="help-icon">⚡</span><div class="help-text"><b>MACD</b> — Trend-momentum indicator. MACD line crossing above signal line = bullish. Crossing below = bearish. Histogram bars show the strength of the move.</div></div>
     </div>
 
     <!-- Footer -->
@@ -2637,6 +2654,21 @@ function switchView(view, el) {
     else loadData();
     pushNav({view:'chart', ticker});
   }
+}
+
+function switchToIntel() {
+  // Make sure picks view is visible first
+  if(document.getElementById('picksView').style.display === 'none') {
+    switchView('picks', document.getElementById('viewBtnPicks'));
+  }
+  // Highlight the Intel tab button
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('viewBtnIntel').classList.add('active');
+  // Scroll the intel section into view
+  setTimeout(() => {
+    const el = document.getElementById('intelSection');
+    if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
 }
 
 // ═══════════════════════════════════════
