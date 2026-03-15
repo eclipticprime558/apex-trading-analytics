@@ -918,99 +918,110 @@ function highlightAC(items) {
 }
 
 async function fetchSuggestions(q) {
-  if(!getKey()){
-    // No Finnhub key — show common tickers as hints
-    const common = ['AAPL','MSFT','GOOGL','AMZN','TSLA','META','NVDA','SPY','QQQ','BRK.B','JPM','V','WMT','XOM','JNJ'];
-    const matches = common.filter(t=>t.startsWith(q.toUpperCase())).slice(0,5);
-    if(!matches.length){acDrop.style.display='none';return;}
-    acDrop.innerHTML = matches.map(t=>`
-      <div class="ac-item" data-ticker="${t}" data-name="">
-        <span class="ac-ticker">${t}</span>
-        <span class="ac-name" style="color:var(--text3)">Add Finnhub key for full company search</span>
-      </div>`).join('');
-    acDrop.style.display='block';
-    acDrop.querySelectorAll('.ac-item').forEach(el=>{
-      el.addEventListener('click',()=>{
-        ticker=el.dataset.ticker; searchInput.value=ticker;
-        acDrop.style.display='none'; loadData();
-      });
-    });
-    return;
-  }
+  // Always try Yahoo Finance search first via our proxy — works without any API key
   try {
-    const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
-    const results = (json?.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETF'||r.type==='ADR'||r.type==='Crypto');
-    if(!results.length){acDrop.style.display='none';return;}
-    acSelected = -1;
-    acDrop.innerHTML = results.slice(0,7).map(r=>`
-      <div class="ac-item" data-ticker="${r.symbol}" data-name="${r.description||''}">
-        <span class="ac-ticker">${r.symbol}</span>
-        <span class="ac-name">${r.description||''}</span>
-        <span class="ac-type">${r.type||'Stock'}</span>
-      </div>
-    `).join('');
-    acDrop.style.display='block';
-    acDrop.querySelectorAll('.ac-item').forEach(el=>{
-      el.addEventListener('click',()=>{
-        ticker = el.dataset.ticker;
-        companyName = el.dataset.name;
-        searchInput.value = ticker;
-        acDrop.style.display='none';
-        loadData();
+    const yahooSearchUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0&enableFuzzyQuery=true&quotesQueryId=tss_match_phrase_query`;
+    const json = await yhFetch(yahooSearchUrl);
+    const quotes = (json?.finance?.result?.[0]?.quotes || [])
+      .filter(r => r.quoteType === 'EQUITY' || r.quoteType === 'ETF' || r.quoteType === 'MUTUALFUND' || r.quoteType === 'CRYPTOCURRENCY');
+    if(quotes.length) {
+      acSelected = -1;
+      acDrop.innerHTML = quotes.slice(0,8).map(r=>`
+        <div class="ac-item" data-ticker="${r.symbol}" data-name="${r.longname||r.shortname||''}">
+          <span class="ac-ticker">${r.symbol}</span>
+          <span class="ac-name">${r.longname||r.shortname||''}</span>
+          <span class="ac-type">${r.quoteType||'Stock'}</span>
+        </div>
+      `).join('');
+      acDrop.style.display='block';
+      acDrop.querySelectorAll('.ac-item').forEach(el=>{
+        el.addEventListener('click',()=>{
+          ticker = el.dataset.ticker;
+          companyName = el.dataset.name;
+          searchInput.value = ticker;
+          acDrop.style.display='none';
+          loadData();
+        });
       });
+      return;
+    }
+  } catch(e){ /* fall through to Finnhub or static list */ }
+
+  // Fallback: Finnhub search if key available
+  if(getKey()) {
+    try {
+      const json = await finnhubFetch(`/search?q=${encodeURIComponent(q)}`);
+      const results = (json?.result||[]).filter(r=>r.type==='Common Stock'||r.type==='ETF'||r.type==='ADR'||r.type==='Crypto');
+      if(results.length) {
+        acSelected = -1;
+        acDrop.innerHTML = results.slice(0,7).map(r=>`
+          <div class="ac-item" data-ticker="${r.symbol}" data-name="${r.description||''}">
+            <span class="ac-ticker">${r.symbol}</span>
+            <span class="ac-name">${r.description||''}</span>
+            <span class="ac-type">${r.type||'Stock'}</span>
+          </div>
+        `).join('');
+        acDrop.style.display='block';
+        acDrop.querySelectorAll('.ac-item').forEach(el=>{
+          el.addEventListener('click',()=>{
+            ticker = el.dataset.ticker;
+            companyName = el.dataset.name;
+            searchInput.value = ticker;
+            acDrop.style.display='none';
+            loadData();
+          });
+        });
+        return;
+      }
+    } catch(e){}
+  }
+
+  // Last resort: static common ticker list
+  const common = ['AAPL','MSFT','GOOGL','AMZN','TSLA','META','NVDA','SPY','QQQ','BRK.B','JPM','V','WMT','XOM','JNJ','AMD','NFLX','DIS','BABA','UBER'];
+  const matches = common.filter(t=>t.startsWith(q.toUpperCase())).slice(0,5);
+  if(!matches.length){acDrop.style.display='none';return;}
+  acSelected = -1;
+  acDrop.innerHTML = matches.map(t=>`
+    <div class="ac-item" data-ticker="${t}" data-name="">
+      <span class="ac-ticker">${t}</span>
+    </div>`).join('');
+  acDrop.style.display='block';
+  acDrop.querySelectorAll('.ac-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      ticker=el.dataset.ticker; searchInput.value=ticker;
+      acDrop.style.display='none'; loadData();
     });
-  } catch(e){ acDrop.style.display='none'; }
+  });
 }
 
 // ═══════════════════════════════════════
 //  YAHOO FINANCE FALLBACK
 // ═══════════════════════════════════════
-const YH_PROXIES = [
-  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
-  u=>`https://cors.sh/?${u}`,
-];
-// Race ALL proxies simultaneously — use whichever responds first
-async function yhFetch(url) {
-  const timeout = 7000;
-  const tryProxy = fn => new Promise((resolve, reject) => {
-    const t = setTimeout(()=>reject(new Error('timeout')), timeout);
-    fetch(fn(url))
-      .then(async r => {
-        clearTimeout(t);
-        if(!r.ok) return reject(new Error('HTTP '+r.status));
-        const txt = await r.text();
-        if(!txt.trim().startsWith('{')&&!txt.trim().startsWith('['))
-          return reject(new Error('non-json'));
-        resolve(JSON.parse(txt));
-      })
-      .catch(e=>{ clearTimeout(t); reject(e); });
-  });
-  try {
-    return await Promise.any(YH_PROXIES.map(tryProxy));
-  } catch(e) {
-    throw new Error('Unable to reach market data. Try a different browser, disable ad-blockers, or check your connection.');
-  }
+// ── Our own Vercel proxy — fast, reliable, no rate limits ──
+async function yhFetch(yahooUrl) {
+  const r = await fetch('/api/proxy?url=' + encodeURIComponent(yahooUrl));
+  if (!r.ok) throw new Error('Proxy error: HTTP ' + r.status);
+  return r.json();
 }
+
 async function loadCandlesYahoo(sym, interval, range) {
-  const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${interval}&range=${range}&includePrePost=false`;
-  let json;
-  try{ json=await yhFetch(url); }
-  catch(e){
-    const url2=url.replace('query1','query2');
-    json=await yhFetch(url2);
-  }
-  const result=json?.chart?.result?.[0];
-  if(!result) throw new Error(json?.chart?.error?.description||`No data for "${sym}"`);
-  if(!companyName) companyName=result.meta?.longName||result.meta?.shortName||sym;
-  const ts=result.timestamp, q=result.indicators.quote[0];
-  const rows=[];
-  for(let i=0;i<ts.length;i++){
-    if(q.close[i]==null||q.open[i]==null) continue;
-    rows.push({date:new Date(ts[i]*1000),open:+q.open[i].toFixed(4),high:+q.high[i].toFixed(4),
-      low:+q.low[i].toFixed(4),close:+q.close[i].toFixed(4),volume:q.volume[i]||0});
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${interval}&range=${range}&includePrePost=false`;
+  const json = await yhFetch(url);
+  const result = json?.chart?.result?.[0];
+  if (!result) throw new Error(json?.chart?.error?.description || `No data found for "${sym}". Check the ticker symbol.`);
+  if (!companyName) companyName = result.meta?.longName || result.meta?.shortName || sym;
+  const ts = result.timestamp, q = result.indicators.quote[0];
+  const rows = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.close[i] == null || q.open[i] == null) continue;
+    rows.push({
+      date:   new Date(ts[i] * 1000),
+      open:   +q.open[i].toFixed(4),
+      high:   +q.high[i].toFixed(4),
+      low:    +q.low[i].toFixed(4),
+      close:  +q.close[i].toFixed(4),
+      volume: q.volume[i] || 0,
+    });
   }
   return rows;
 }
