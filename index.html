@@ -636,10 +636,20 @@ body{
     </div>
     <div class="refresh-info" id="refreshInfo" onclick="loadData()" title="Click to refresh">↻ —</div>
     <div class="clock" id="clock">00:00:00</div>
+  <button onclick="toggleDebug()" style="background:rgba(248,81,73,.15);border:1px solid rgba(248,81,73,.4);color:#f85149;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;font-family:monospace;">DEBUG</button>
   </div>
 </header>
 
 <div id="alertBox"></div>
+
+<!-- Debug Console -->
+<div id="debugPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:220px;background:#0d1117;border-top:2px solid #f85149;z-index:9999;font-family:monospace;font-size:11px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 10px;background:#161b22;border-bottom:1px solid #30363d;">
+    <span style="color:#f85149;font-weight:700;">⬛ APEX DEBUG CONSOLE</span>
+    <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:14px;">✕</button>
+  </div>
+  <div id="debugLog" style="overflow-y:auto;height:186px;padding:6px 10px;"></div>
+</div>
 
 <!-- View Nav -->
 <div class="view-nav">
@@ -914,6 +924,22 @@ async function refreshLivePrice() {
 }
 
 // ═══════════════════════════════════════
+//  DEBUG LOGGER
+// ═══════════════════════════════════════
+function dbg(msg, type='info') {
+  const colors = { info:'#58a6ff', ok:'#3fb950', err:'#f85149', warn:'#d29922' };
+  const ts = new Date().toLocaleTimeString('en-US',{hour12:false});
+  const line = `<div style="color:${colors[type]||colors.info};padding:1px 0;border-bottom:1px solid #21262d;">[${ts}] ${msg}</div>`;
+  const log = document.getElementById('debugLog');
+  if(log) { log.innerHTML += line; log.scrollTop = log.scrollHeight; }
+  console.log(`[APEX ${type.toUpperCase()}] ${msg}`);
+}
+function toggleDebug() {
+  const p = document.getElementById('debugPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════
 //  FINNHUB — routed through server proxy
 //  Key stored as FINNHUB_KEY env var on Vercel
 // ═══════════════════════════════════════
@@ -935,10 +961,12 @@ function rangeToSeconds(range) {
 }
 
 async function finnhubFetch(path) {
-  // Key is injected server-side by api/proxy.js from FINNHUB_KEY env var
-  const r = await fetch('/api/proxy?url=' + encodeURIComponent(`${FINNHUB_BASE}${path}`));
-  if(r.status===429) throw new Error('Rate limit hit — wait a moment and retry.');
-  if(!r.ok) throw new Error('Finnhub error: HTTP '+r.status);
+  const proxyUrl = '/api/proxy?url=' + encodeURIComponent(`${FINNHUB_BASE}${path}`);
+  dbg(`Finnhub → ${path.split('?')[0]}`);
+  const r = await fetch(proxyUrl);
+  if(r.status===429) { dbg('Finnhub rate limit hit','warn'); throw new Error('Rate limit hit — wait a moment and retry.'); }
+  if(!r.ok) { dbg(`Finnhub HTTP ${r.status}`,'err'); throw new Error('Finnhub error: HTTP '+r.status); }
+  dbg(`Finnhub ${path.split('?')[0]} → OK`,'ok');
   return r.json();
 }
 
@@ -1063,8 +1091,11 @@ async function fetchSuggestions(q) {
 // ═══════════════════════════════════════
 // ── Our own Vercel proxy — fast, reliable, no rate limits ──
 async function yhFetch(yahooUrl) {
+  const shortUrl = yahooUrl.split('?')[0].replace('https://query1.finance.yahoo.com','YF');
+  dbg(`Yahoo → ${shortUrl}`);
   const r = await fetch('/api/proxy?url=' + encodeURIComponent(yahooUrl));
-  if (!r.ok) throw new Error('Proxy error: HTTP ' + r.status);
+  if (!r.ok) { dbg(`Yahoo ${shortUrl} → HTTP ${r.status}`,'err'); throw new Error('Proxy error: HTTP ' + r.status); }
+  dbg(`Yahoo ${shortUrl} → OK`,'ok');
   return r.json();
 }
 
@@ -1097,6 +1128,7 @@ async function loadData() {
   const inputVal = searchInput.value.trim().toUpperCase();
   if(inputVal) ticker = inputVal;
   if(!ticker) return;
+  dbg(`loadData() → ticker=${ticker}`);
 
   const range    = document.getElementById('rangeSelect').value;
   const interval = document.getElementById('intervalSelect').value;
@@ -1136,17 +1168,19 @@ async function loadData() {
             .catch(()=>{});
         }
     } catch(e) {
-      // Finnhub failed — fall through to Yahoo Finance
+      dbg(`Finnhub failed: ${e.message} — trying Yahoo Finance`,'warn');
       rawData = [];
     }
 
     // ── Fall back to Yahoo Finance if Finnhub gave nothing ──
     if(!rawData.length) {
+      dbg('Fetching from Yahoo Finance...');
       rawData = await loadCandlesYahoo(ticker, interval, range);
       source  = 'Yahoo Finance';
     }
 
     if(!rawData.length) throw new Error(`No data returned for "${ticker}". Check the symbol and try again.`);
+    dbg(`Loaded ${rawData.length} candles from ${source}`,'ok');
 
     viewCount = Math.min(rawData.length, 80);
     viewStart = Math.max(0, rawData.length - viewCount);
@@ -2172,6 +2206,7 @@ let picksRefreshTimer = null;
 let picksLoaded = false;
 
 function switchView(view, el) {
+  dbg(`switchView(${view})`);
   document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   const chartView = document.getElementById('chartView');
@@ -2205,6 +2240,7 @@ const PULSE_SYMS = ['SPY','QQQ','DIA','IWM','^VIX'];
 // Fetch a single symbol's quote data via v8/chart (no auth required)
 async function fetchPickQuote(sym) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d&includePrePost=false`;
+  dbg(`fetchPickQuote(${sym})`);
   const json = await yhFetch(url);
   const result = json?.chart?.result?.[0];
   if(!result) return null;
@@ -2228,6 +2264,7 @@ async function fetchPickQuote(sym) {
 
 async function loadPicks() {
   picksLoaded = true;
+  dbg('loadPicks() started');
   const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
   document.getElementById('pulseBar').innerHTML = '<div class="pulse-loading">Loading market data…</div>';
   ['col-ai','col-early','col-sectors'].forEach(id => {
@@ -2237,12 +2274,20 @@ async function loadPicks() {
   // Fetch all symbols in parallel via v8/chart (works without auth)
   const results = await Promise.allSettled(allSyms.map(sym => fetchPickQuote(sym)));
   const quotes = {};
+  let failCount = 0;
   results.forEach((r, i) => {
-    if(r.status === 'fulfilled' && r.value) quotes[allSyms[i]] = r.value;
+    if(r.status === 'fulfilled' && r.value) {
+      quotes[allSyms[i]] = r.value;
+    } else {
+      failCount++;
+      dbg(`${allSyms[i]} failed: ${r.reason?.message||r.status}`,'err');
+    }
   });
+  dbg(`loadPicks: ${Object.keys(quotes).length} OK, ${failCount} failed`, failCount>0?'warn':'ok');
 
   if(!Object.keys(quotes).length) {
     document.getElementById('pulseBar').innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ All requests failed — check proxy deployment</div>`;
+    dbg('loadPicks: ALL symbols failed — proxy likely broken','err');
     return;
   }
 
@@ -2363,6 +2408,8 @@ function loadPickStock(sym) {
 // ═══════════════════════════════════════
 window.addEventListener('load',()=>{
   document.getElementById('loading').style.display='none';
+  dbg('Page loaded — initializing APEX');
+  dbg(`Proxy endpoint: /api/proxy`);
   setupChartEvents();
   switchView('picks', document.getElementById('viewBtnPicks'));
 });
