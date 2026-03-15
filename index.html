@@ -537,9 +537,11 @@ body{
   width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:12px;
 }
-.pick-score.buy{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3);}
+.pick-score.strong-buy{background:rgba(63,185,80,.25);color:#3fb950;border:2px solid rgba(63,185,80,.6);}
+.pick-score.buy{background:rgba(63,185,80,.12);color:var(--green);border:1px solid rgba(63,185,80,.3);}
 .pick-score.hold{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3);}
-.pick-score.sell{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.pick-score.sell{background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.pick-score.strong-sell{background:rgba(248,81,73,.25);color:#f85149;border:2px solid rgba(248,81,73,.6);}
 .pick-sig{font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);}
 .picks-loading{padding:24px;text-align:center;color:var(--text3);font-size:12px;}
 .picks-footer{
@@ -2449,19 +2451,27 @@ async function fetchPickQuote(sym) {
   const change = (price && prevClose) ? price - prevClose : 0;
   const changePct = prevClose ? (change / prevClose) * 100 : 0;
 
-  // 52W high/low from actual candle data (more reliable than meta)
-  const closes = result.indicators?.quote?.[0]?.close?.filter(v => v != null) || [];
-  const highs  = result.indicators?.quote?.[0]?.high?.filter(v => v != null) || [];
-  const lows   = result.indicators?.quote?.[0]?.low?.filter(v => v != null) || [];
+  // Build full candle array for technical analysis
+  const ts  = result.timestamp || [];
+  const raw = result.indicators?.quote?.[0] || {};
+  const candles = [];
+  for(let i = 0; i < ts.length; i++) {
+    if(raw.close?.[i] == null || raw.open?.[i] == null) continue;
+    candles.push({ date: new Date(ts[i]*1000), open: raw.open[i], high: raw.high[i], low: raw.low[i], close: raw.close[i], volume: raw.volume?.[i] || 0 });
+  }
+
+  // Run the SAME scoring engine used by the Chart view
+  const { score, label } = calcSignalScore(candles);
+
+  const highs   = candles.map(c => c.high);
+  const lows    = candles.map(c => c.low);
+  const volumes = candles.map(c => c.volume);
   const w52High = meta.fiftyTwoWeekHigh ?? (highs.length ? Math.max(...highs) : null);
   const w52Low  = meta.fiftyTwoWeekLow  ?? (lows.length  ? Math.min(...lows)  : null);
-
-  // Volume: latest day vs average
-  const volumes = result.indicators?.quote?.[0]?.volume?.filter(v => v != null) || [];
   const latestVol = meta.regularMarketVolume ?? (volumes.length ? volumes[volumes.length-1] : null);
-  const avgVol = volumes.length > 5 ? Math.round(volumes.slice(-60).reduce((a,b)=>a+b,0) / Math.min(volumes.length,60)) : null;
+  const avgVol    = volumes.length > 5 ? Math.round(volumes.slice(-60).reduce((a,b)=>a+b,0) / Math.min(volumes.length,60)) : null;
 
-  dbg(`${sym}: price=${price?.toFixed(2)} chg=${changePct?.toFixed(2)}% vol=${latestVol?.toLocaleString()} 52H=${w52High?.toFixed(2)} 52L=${w52Low?.toFixed(2)}`,'ok');
+  dbg(`${sym}: ${label} ${score} | price=${price?.toFixed(2)} chg=${changePct?.toFixed(2)}%`,'ok');
 
   return {
     symbol: sym,
@@ -2473,6 +2483,9 @@ async function fetchPickQuote(sym) {
     averageDailyVolume3Month: avgVol,
     fiftyTwoWeekHigh: w52High,
     fiftyTwoWeekLow: w52Low,
+    technicalScore: score,    // from same engine as Chart view
+    technicalLabel: label,
+    _candles: candles,        // stored for tooltip factor breakdown
   };
 }
 
@@ -2566,52 +2579,87 @@ function calcQuickScore(q) {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-function pickSig(s)  { return s >= 65 ? 'BUY' : s >= 45 ? 'HOLD' : 'SELL'; }
-function pickCls(s)  { return s >= 65 ? 'buy'  : s >= 45 ? 'hold'  : 'sell'; }
+// ── Unified signal scorer — same engine used by both Chart and Market Picks ──
+function calcSignalScore(candles) {
+  if(!candles || candles.length < 30) return { score: 50, label: 'HOLD', factors: [] };
+  const closes  = candles.map(d => d.close);
+  const n       = closes.length;
+  const returns = closes.map((c,i) => i===0 ? 0 : (c-closes[i-1])/closes[i-1]*100);
+  const rsiArr  = calcRSI(closes);
+  const {macd: macdArr, signal: sigArr} = calcMACD(closes);
+  const ma20Arr = calcMA(closes, 20);
+  const ma50Arr = calcMA(closes, 50);
+  const bbArr   = calcBollinger(closes);
 
-// Build a human-readable score breakdown for the tooltip
-function buildScoreExplain(sym, q, score) {
+  const lastClose = closes[n-1];
+  const lastRSI   = rsiArr.filter(x=>x!=null).pop()  || 50;
+  const lastMACD  = macdArr[n-1]  || 0, lastSig  = sigArr[n-1]  || 0;
+  const prevMACD  = macdArr[n-2]  || 0, prevSig  = sigArr[n-2]  || 0;
+  const lma20     = ma20Arr[n-1]  || lastClose;
+  const lma50     = ma50Arr[n-1]  || lastClose;
+  const lbb       = bbArr[n-1];
+  const mom5      = avg(returns.slice(-5));
+  const avgVol5   = avg(candles.slice(-5).map(d=>d.volume));
+  const avgVol20  = avg(candles.slice(-20).map(d=>d.volume));
+
+  let score = 50;
   const factors = [];
 
-  // Factor 1: Daily momentum
-  const chg = q.regularMarketChangePercent || 0;
-  let momPts = chg > 4 ? 18 : chg > 2 ? 11 : chg > 0 ? 4 : chg < -4 ? -18 : chg < -2 ? -11 : -4;
-  const momDir = chg >= 0 ? 'up' : 'down';
-  factors.push({
-    icon: chg >= 0 ? '📈' : '📉',
-    label: 'Daily Momentum',
-    detail: `Price is ${momDir} ${Math.abs(chg).toFixed(2)}% today`,
-    pts: momPts,
-  });
+  // RSI
+  if(lastRSI > 70)      { score -= 18; factors.push({icon:'📉', label:'RSI Overbought',    detail:`RSI ${lastRSI.toFixed(1)} — price may be overextended, pullback risk`, pts:-18}); }
+  else if(lastRSI < 30) { score += 18; factors.push({icon:'📈', label:'RSI Oversold',      detail:`RSI ${lastRSI.toFixed(1)} — price beaten down, potential bounce zone`, pts:+18}); }
+  else if(lastRSI >= 55){ score += 8;  factors.push({icon:'◎',  label:'RSI Bullish Zone',  detail:`RSI ${lastRSI.toFixed(1)} — momentum trending upward`, pts:+8}); }
+  else if(lastRSI <= 45){ score -= 8;  factors.push({icon:'◎',  label:'RSI Bearish Zone',  detail:`RSI ${lastRSI.toFixed(1)} — momentum trending downward`, pts:-8}); }
+  else                  {              factors.push({icon:'◎',  label:'RSI Neutral',        detail:`RSI ${lastRSI.toFixed(1)} — no strong directional signal`, pts:0}); }
 
-  // Factor 2: 52-week position
-  const hi = q.fiftyTwoWeekHigh, lo = q.fiftyTwoWeekLow, p = q.regularMarketPrice;
-  let posPts = 0, posDetail = 'Middle of 52W range — neutral';
-  if(hi && lo && hi !== lo) {
-    const pos = (p - lo) / (hi - lo);
-    const pct = Math.round(pos * 100);
-    if     (pos < 0.20) { posPts = 14; posDetail = `Bottom ${pct}% of 52W range — deep discount, potential accumulation zone`; }
-    else if(pos < 0.35) { posPts = 8;  posDetail = `Lower ${pct}% of 52W range — value territory, buyers often step in here`; }
-    else if(pos > 0.92) { posPts = 10; posDetail = `Top ${pct}% of 52W range — near highs, strong uptrend momentum`; }
-    else if(pos > 0.75) { posPts = 5;  posDetail = `Upper ${pct}% of 52W range — positive trend, bullish territory`; }
-    else                { posPts = 0;  posDetail = `${pct}% of 52W range — mid-range, no strong directional signal`; }
+  // MACD
+  const macdCross  = lastMACD > lastSig && prevMACD <= prevSig;
+  const macdDcross = lastMACD < lastSig && prevMACD >= prevSig;
+  if(macdCross)       { score += 18; factors.push({icon:'↗', label:'MACD Bullish Cross', detail:'MACD just crossed above signal line — fresh buy signal', pts:+18}); }
+  else if(macdDcross) { score -= 18; factors.push({icon:'↘', label:'MACD Bearish Cross', detail:'MACD just crossed below signal line — fresh sell signal', pts:-18}); }
+  else if(lastMACD > lastSig){ score += 8; factors.push({icon:'▲', label:'MACD Bullish', detail:'MACD above signal line — upward momentum', pts:+8}); }
+  else                { score -= 8;  factors.push({icon:'▼', label:'MACD Bearish',       detail:'MACD below signal line — downward momentum', pts:-8}); }
+
+  // MA position
+  const ma20Pct = ((lastClose/lma20-1)*100).toFixed(1);
+  if(lastClose > lma20){ score += 8; factors.push({icon:'📊', label:'Above MA20', detail:`Price ${ma20Pct}% above 20-day avg — short-term uptrend`, pts:+8}); }
+  else                 { score -= 8; factors.push({icon:'📊', label:'Below MA20', detail:`Price ${ma20Pct}% below 20-day avg — short-term downtrend`, pts:-8}); }
+  if(lastClose > lma50) score += 8; else score -= 8;
+
+  // 5-day momentum
+  if(mom5 > 0.2)       { score += 10; factors.push({icon:'⚡', label:'5D Momentum +',  detail:`Average daily return +${mom5.toFixed(2)}% over last 5 sessions`, pts:+10}); }
+  else if(mom5 < -0.2) { score -= 10; factors.push({icon:'⚡', label:'5D Momentum −',  detail:`Average daily return ${mom5.toFixed(2)}% over last 5 sessions`, pts:-10}); }
+
+  // Volume confirmation
+  if(avgVol5 > avgVol20 * 1.3) {
+    const dir = mom5 > 0;
+    const volPct = ((avgVol5/avgVol20-1)*100).toFixed(0);
+    score += dir ? 8 : -8;
+    factors.push({icon:'📦', label:`Volume ${dir?'Confirms':'Warns'}`, detail:`5-day avg volume ${volPct}% above normal — ${dir?'buying pressure confirmed':'selling pressure confirmed'}`, pts:dir?8:-8});
   }
-  factors.push({ icon: '📍', label: '52-Week Position', detail: posDetail, pts: posPts });
 
-  // Factor 3: Volume spike
-  const vol = q.regularMarketVolume, avg = q.averageDailyVolume3Month;
-  let volPts = 0, volDetail = 'Volume data unavailable';
-  if(vol && avg && avg > 0) {
-    const r = vol / avg;
-    if     (r > 3.0) { volPts = 16; volDetail = `${r.toFixed(1)}x average volume — very unusual activity, big players moving`; }
-    else if(r > 2.0) { volPts = 10; volDetail = `${r.toFixed(1)}x average volume — elevated interest, above-normal trading`; }
-    else if(r > 1.5) { volPts = 5;  volDetail = `${r.toFixed(1)}x average volume — slightly above normal, mild interest`; }
-    else if(r < 0.4) { volPts = -6; volDetail = `${r.toFixed(1)}x average volume — very low activity, weak conviction`; }
-    else             { volPts = 0;  volDetail = `${r.toFixed(1)}x average volume — normal trading activity`; }
+  // Bollinger Bands
+  if(lbb && lbb.upper != null) {
+    if(lastClose > lbb.upper)      { score -= 10; factors.push({icon:'↑', label:'Above Bollinger Upper', detail:'Price above upper band — statistically overbought', pts:-10}); }
+    else if(lastClose < lbb.lower) { score += 10; factors.push({icon:'↓', label:'Below Bollinger Lower', detail:'Price below lower band — statistically oversold', pts:+10}); }
   }
-  factors.push({ icon: '🔥', label: 'Volume Activity', detail: volDetail, pts: volPts });
 
-  return { sym, score, factors };
+  score = Math.max(0, Math.min(100, score));
+  const label = score>=72 ? 'STRONG BUY' : score>=58 ? 'BUY' : score>=42 ? 'HOLD' : score>=28 ? 'SELL' : 'STRONG SELL';
+  return { score, label, factors };
+}
+
+function pickSig(s)  {
+  return s>=72 ? 'STRONG BUY' : s>=58 ? 'BUY' : s>=42 ? 'HOLD' : s>=28 ? 'SELL' : 'STRONG SELL';
+}
+function pickCls(s)  {
+  return s>=72 ? 'strong-buy' : s>=58 ? 'buy' : s>=42 ? 'hold' : s>=28 ? 'sell' : 'strong-sell';
+}
+
+// Tooltip explanation — uses same factors from calcSignalScore
+function buildScoreExplain(sym, q, score) {
+  const result = calcSignalScore(q._candles || []);
+  return { sym, score: result.score, factors: result.factors };
 }
 
 // Tooltip show/hide
@@ -2662,7 +2710,7 @@ document.addEventListener('mousemove', e => {
 function renderPicksCol(colId, tickers, quotes) {
   const col = document.getElementById(colId);
   const scored = tickers
-    .map(sym => ({ sym, q: quotes[sym], score: quotes[sym] ? calcQuickScore(quotes[sym]) : 50 }))
+    .map(sym => ({ sym, q: quotes[sym], score: quotes[sym]?.technicalScore ?? 50 }))
     .sort((a,b) => b.score - a.score);
 
   col.innerHTML = scored.map(({ sym, q, score }) => {
