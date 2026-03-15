@@ -451,6 +451,108 @@ body{
 .neut{color:var(--yellow)!important;}
 .muted{color:var(--text2)!important;}
 
+/* ── View Nav ── */
+.view-nav{
+  display:flex;align-items:center;gap:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0 18px;
+}
+.view-btn{
+  background:none;border:none;color:var(--text2);
+  font-size:11px;font-weight:500;letter-spacing:.5px;
+  padding:10px 18px;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:all .2s;text-transform:uppercase;
+  font-family:'Inter',sans-serif;
+}
+.view-btn:hover{color:var(--text);}
+.view-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── Market Pulse Bar ── */
+.pulse-bar{
+  display:flex;align-items:center;gap:0;
+  padding:8px 20px;background:var(--bg2);border-bottom:1px solid var(--border);
+  overflow-x:auto;
+}
+.pulse-item{
+  display:flex;flex-direction:column;gap:2px;
+  padding:4px 20px;border-right:1px solid var(--border);
+  min-width:90px;
+}
+.pulse-item:first-child{padding-left:0;}
+.pulse-sym{font-size:10px;color:var(--text2);letter-spacing:.5px;text-transform:uppercase;}
+.pulse-price{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;}
+.pulse-chg{font-family:'JetBrains Mono',monospace;font-size:11px;}
+.pulse-loading{color:var(--text3);font-size:12px;padding:10px 0;}
+
+/* ── Picks Layout ── */
+.picks-layout{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+  padding:16px;max-width:1700px;margin:0 auto;
+}
+@media(max-width:1000px){.picks-layout{grid-template-columns:1fr;}}
+.picks-col{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;
+}
+.picks-col-hdr{
+  display:flex;flex-direction:column;gap:3px;
+  padding:13px 16px;border-bottom:1px solid var(--border);
+  background:rgba(88,166,255,.04);
+}
+.picks-col-hdr--radar{background:rgba(251,143,68,.04);}
+.picks-col-hdr--sector{background:rgba(163,113,247,.04);}
+.picks-col-title{
+  font-size:11px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--accent);
+  display:flex;align-items:center;gap:6px;
+}
+.picks-col-hdr--radar .picks-col-title{color:var(--orange);}
+.picks-col-hdr--sector .picks-col-title{color:var(--purple);}
+.picks-col-sub{font-size:10px;color:var(--text3);}
+
+/* ── Pick Card ── */
+.pick-card{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;border-bottom:1px solid rgba(48,54,61,.5);
+  cursor:pointer;transition:background .15s;
+}
+.pick-card:last-child{border-bottom:none;}
+.pick-card:hover{background:rgba(88,166,255,.05);}
+.pick-sym{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:13px;min-width:52px;color:var(--text);
+}
+.pick-info{flex:1;min-width:0;}
+.pick-name{font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px;}
+.pick-price{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.pick-chg{font-family:'JetBrains Mono',monospace;font-size:11px;}
+.pick-meta{font-size:9px;color:var(--text3);margin-top:3px;}
+.pick-vol-bar{height:2px;background:var(--border);border-radius:1px;margin-top:4px;}
+.pick-vol-fill{height:100%;border-radius:1px;transition:width .3s;}
+.pick-score-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:46px;}
+.pick-score{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;
+}
+.pick-score.buy{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3);}
+.pick-score.hold{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3);}
+.pick-score.sell{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+.pick-sig{font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);}
+.picks-loading{padding:24px;text-align:center;color:var(--text3);font-size:12px;}
+.picks-footer{
+  text-align:center;padding:12px 16px;
+  font-size:10px;color:var(--text3);letter-spacing:.3px;
+  border-top:1px solid var(--border);margin-top:4px;
+}
+.picks-refresh-btn{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  font-size:10px;padding:4px 12px;border-radius:4px;cursor:pointer;
+  font-family:'Inter',sans-serif;margin-left:10px;transition:all .2s;
+}
+.picks-refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
+
 /* API Key Modal */
 .modal-backdrop{
   position:fixed;inset:0;background:rgba(0,0,0,0.7);
@@ -566,6 +668,45 @@ body{
 
 <div id="alertBox"></div>
 
+<!-- View Nav -->
+<div class="view-nav">
+  <button class="view-btn active" id="viewBtnChart" onclick="switchView('chart',this)">◈ Chart</button>
+  <button class="view-btn" id="viewBtnPicks" onclick="switchView('picks',this)">⬡ Market Picks</button>
+</div>
+
+<!-- Market Picks View -->
+<div id="picksView" style="display:none">
+  <!-- Market Pulse -->
+  <div class="pulse-bar" id="pulseBar">
+    <div class="pulse-loading">Loading market data...</div>
+  </div>
+  <!-- Picks Grid -->
+  <div class="picks-layout">
+    <div class="picks-col">
+      <div class="picks-col-hdr">
+        <span class="picks-col-title">⬡ AI Top Picks</span>
+        <span class="picks-col-sub">High conviction · Large &amp; Mid cap · Click any to load chart</span>
+      </div>
+      <div id="col-ai" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+    <div class="picks-col">
+      <div class="picks-col-hdr picks-col-hdr--radar">
+        <span class="picks-col-title picks-col-hdr--radar">◎ Early Entry Radar</span>
+        <span class="picks-col-sub">Small/Mid cap · Under $50 · Momentum &amp; volume spikes</span>
+      </div>
+      <div id="col-early" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+    <div class="picks-col">
+      <div class="picks-col-hdr picks-col-hdr--sector">
+        <span class="picks-col-title picks-col-hdr--sector">▦ Sector Trends</span>
+        <span class="picks-col-sub">ETF flows · Capital rotation · Macro signals</span>
+      </div>
+      <div id="col-sectors" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+  </div>
+  <div class="picks-footer" id="picksFooter">⚠ Scores are technical momentum signals only — not financial advice. Always do your own research.</div>
+</div>
+
 <!-- Quote bar -->
 <div class="quote-bar" id="quoteBar" style="display:none">
   <div>
@@ -589,8 +730,8 @@ body{
   </div>
 </div>
 
-<!-- Workspace -->
-<div class="workspace">
+<!-- Workspace (Chart View) -->
+<div class="workspace" id="chartView">
 
   <!-- Chart area -->
   <div style="display:flex;flex-direction:column;gap:12px;">
@@ -2101,6 +2242,174 @@ function exportCSV(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=ticker+'_apex.csv';a.click();
+}
+
+// ═══════════════════════════════════════
+//  VIEW SWITCHING  (Chart ↔ Market Picks)
+// ═══════════════════════════════════════
+let picksRefreshTimer = null;
+let picksLoaded = false;
+
+function switchView(view, el) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const chartView = document.getElementById('chartView');
+  const picksView = document.getElementById('picksView');
+  const qBar      = document.getElementById('quoteBar');
+  if(view === 'picks') {
+    chartView.style.display = 'none';
+    qBar.style.display      = 'none';
+    picksView.style.display = 'block';
+    if(!picksLoaded) loadPicks();
+    clearInterval(picksRefreshTimer);
+    picksRefreshTimer = setInterval(loadPicks, 90000);
+  } else {
+    picksView.style.display = 'none';
+    clearInterval(picksRefreshTimer);
+    chartView.style.display = 'grid';
+    if(rawData.length) qBar.style.display = 'flex';
+  }
+}
+
+// ═══════════════════════════════════════
+//  MARKET PICKS — DATA + RENDERING
+// ═══════════════════════════════════════
+const WATCHLISTS = {
+  ai: ['NVDA','META','MSFT','AAPL','GOOGL','AMZN','TSLA','AMD','CRM','NFLX','UBER','SHOP'],
+  early: ['PLTR','SOFI','RIVN','IONQ','SOUN','BBAI','MARA','SMCI','RGTI','ACHR','RKLB','LUNR'],
+  sectors: ['XLK','XLF','XLE','XLV','XLI','XLY','XLC','GLD','SLV','TLT','XBI','ARKK'],
+};
+const PULSE_SYMS = ['SPY','QQQ','DIA','IWM','^VIX'];
+
+async function loadPicks() {
+  picksLoaded = true;
+  const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
+  document.getElementById('pulseBar').innerHTML = '<div class="pulse-loading">Loading market data…</div>';
+  ['col-ai','col-early','col-sectors'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="picks-loading">Scanning…</div>';
+  });
+
+  let quotes = {};
+  try {
+    const fields = 'symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,marketCap';
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSyms.join(','))}&fields=${fields}`;
+    const json = await yhFetch(url);
+    (json?.quoteResponse?.result || []).forEach(q => { quotes[q.symbol] = q; });
+  } catch(e) {
+    document.getElementById('pulseBar').innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ Failed: ${e.message}</div>`;
+    return;
+  }
+
+  renderPulseBar(quotes);
+  renderPicksCol('col-ai',      WATCHLISTS.ai,      quotes);
+  renderPicksCol('col-early',   WATCHLISTS.early,   quotes);
+  renderPicksCol('col-sectors', WATCHLISTS.sectors, quotes);
+
+  const ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'America/New_York'});
+  document.getElementById('picksFooter').innerHTML =
+    `Updated ${ts} ET &nbsp;·&nbsp; Scores: momentum + volume spike + 52W position
+     <button class="picks-refresh-btn" onclick="loadPicks()">↻ Refresh</button>
+     <span style="margin-left:12px;color:var(--text3)">⚠ Technical signals only — not financial advice</span>`;
+}
+
+function renderPulseBar(quotes) {
+  const bar = document.getElementById('pulseBar');
+  bar.innerHTML = PULSE_SYMS.map(sym => {
+    const q = quotes[sym];
+    if(!q) return '';
+    const price  = q.regularMarketPrice?.toFixed(2) ?? '—';
+    const chg    = q.regularMarketChangePercent;
+    const chgStr = chg != null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '—';
+    const cls    = chg == null ? '' : chg >= 0 ? 'up' : 'dn';
+    return `<div class="pulse-item">
+      <span class="pulse-sym">${sym.replace('^','')}</span>
+      <span class="pulse-price">${price}</span>
+      <span class="pulse-chg ${cls}">${chgStr}</span>
+    </div>`;
+  }).join('');
+}
+
+function calcQuickScore(q) {
+  let score = 50;
+  // Daily momentum
+  const chg = q.regularMarketChangePercent || 0;
+  if     (chg >  4) score += 18;
+  else if(chg >  2) score += 11;
+  else if(chg >  0) score += 4;
+  else if(chg < -4) score -= 18;
+  else if(chg < -2) score -= 11;
+  else              score -= 4;
+  // 52-week position (near lows = accumulation zone; near highs = strong trend)
+  const hi = q.fiftyTwoWeekHigh, lo = q.fiftyTwoWeekLow, p = q.regularMarketPrice;
+  if(hi && lo && p && hi !== lo) {
+    const pos = (p - lo) / (hi - lo);
+    if     (pos < 0.20) score += 14;  // deep discount — potential coil
+    else if(pos < 0.35) score += 8;
+    else if(pos > 0.92) score += 10;  // near highs — strong momentum
+    else if(pos > 0.75) score += 5;
+  }
+  // Volume spike vs 3-month average
+  const vol = q.regularMarketVolume, avg = q.averageDailyVolume3Month;
+  if(vol && avg && avg > 0) {
+    const r = vol / avg;
+    if     (r > 3.0) score += 16;
+    else if(r > 2.0) score += 10;
+    else if(r > 1.5) score += 5;
+    else if(r < 0.4) score -= 6;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function pickSig(s)  { return s >= 65 ? 'BUY' : s >= 45 ? 'HOLD' : 'SELL'; }
+function pickCls(s)  { return s >= 65 ? 'buy'  : s >= 45 ? 'hold'  : 'sell'; }
+
+function renderPicksCol(colId, tickers, quotes) {
+  const col = document.getElementById(colId);
+  const scored = tickers
+    .map(sym => ({ sym, q: quotes[sym], score: quotes[sym] ? calcQuickScore(quotes[sym]) : 50 }))
+    .sort((a,b) => b.score - a.score);
+
+  col.innerHTML = scored.map(({ sym, q, score }) => {
+    if(!q) return `<div class="pick-card"><span class="pick-sym">${sym}</span><span style="font-size:10px;color:var(--text3)">No data</span></div>`;
+    const price   = q.regularMarketPrice?.toFixed(2) ?? '—';
+    const chg     = q.regularMarketChangePercent;
+    const chgStr  = chg != null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '—';
+    const chgCls  = chg == null ? '' : chg >= 0 ? 'up' : 'dn';
+    const name    = q.shortName || '';
+    const vol     = q.regularMarketVolume, avg = q.averageDailyVolume3Month;
+    const volRatio= (vol && avg && avg > 0) ? vol / avg : 0;
+    const volBarW = Math.round(Math.min(volRatio, 3) / 3 * 100);
+    const volBarC = volRatio > 2 ? 'var(--green)' : volRatio > 1.2 ? 'var(--accent)' : 'var(--text3)';
+    const hi = q.fiftyTwoWeekHigh, lo = q.fiftyTwoWeekLow, p = q.regularMarketPrice;
+    const pos52 = (hi && lo && hi !== lo) ? Math.round(((p-lo)/(hi-lo))*100) : '—';
+    const volLabel = (vol && avg && avg > 0) ? volRatio.toFixed(1) + 'x avg' : '—';
+    return `<div class="pick-card" onclick="loadPickStock('${sym}')">
+      <div class="pick-sym">${sym}</div>
+      <div class="pick-info">
+        <div class="pick-name" title="${name}">${name}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="pick-price">$${price}</span>
+          <span class="pick-chg ${chgCls}">${chgStr}</span>
+        </div>
+        <div class="pick-vol-bar" title="Volume ratio vs 3M avg">
+          <div class="pick-vol-fill" style="width:${volBarW}%;background:${volBarC}"></div>
+        </div>
+        <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}</div>
+      </div>
+      <div class="pick-score-wrap">
+        <div class="pick-score ${pickCls(score)}">${score}</div>
+        <div class="pick-sig">${pickSig(score)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadPickStock(sym) {
+  ticker = sym;
+  companyName = '';
+  document.getElementById('searchInput').value = sym;
+  switchView('chart', document.getElementById('viewBtnChart'));
+  loadData();
 }
 
 // ═══════════════════════════════════════
