@@ -2282,6 +2282,30 @@ const WATCHLISTS = {
 };
 const PULSE_SYMS = ['SPY','QQQ','DIA','IWM','^VIX'];
 
+// Fetch a single symbol's quote data via v8/chart (no auth required)
+async function fetchPickQuote(sym) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d&includePrePost=false`;
+  const json = await yhFetch(url);
+  const result = json?.chart?.result?.[0];
+  if(!result) return null;
+  const meta = result.meta;
+  const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPreviousClose;
+  const price = meta.regularMarketPrice;
+  const change = prevClose ? price - prevClose : 0;
+  const changePct = prevClose ? (change / prevClose) * 100 : 0;
+  return {
+    symbol: sym,
+    shortName: meta.longName || meta.shortName || sym,
+    regularMarketPrice: price,
+    regularMarketChange: change,
+    regularMarketChangePercent: changePct,
+    regularMarketVolume: meta.regularMarketVolume,
+    averageDailyVolume3Month: meta.averageDailyVolume3Month || meta.averageDailyVolume10Day,
+    fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh,
+    fiftyTwoWeekLow: meta.fiftyTwoWeekLow,
+  };
+}
+
 async function loadPicks() {
   picksLoaded = true;
   const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
@@ -2290,14 +2314,15 @@ async function loadPicks() {
     document.getElementById(id).innerHTML = '<div class="picks-loading">Scanning…</div>';
   });
 
-  let quotes = {};
-  try {
-    const fields = 'symbol,shortName,regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,marketCap';
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(allSyms.join(','))}&fields=${fields}`;
-    const json = await yhFetch(url);
-    (json?.quoteResponse?.result || []).forEach(q => { quotes[q.symbol] = q; });
-  } catch(e) {
-    document.getElementById('pulseBar').innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ Failed: ${e.message}</div>`;
+  // Fetch all symbols in parallel via v8/chart (works without auth)
+  const results = await Promise.allSettled(allSyms.map(sym => fetchPickQuote(sym)));
+  const quotes = {};
+  results.forEach((r, i) => {
+    if(r.status === 'fulfilled' && r.value) quotes[allSyms[i]] = r.value;
+  });
+
+  if(!Object.keys(quotes).length) {
+    document.getElementById('pulseBar').innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ All requests failed — check proxy deployment</div>`;
     return;
   }
 
