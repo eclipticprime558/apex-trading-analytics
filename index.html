@@ -2868,34 +2868,39 @@ async function fetchPickQuote(sym) {
   };
 }
 
+async function fetchBatch(syms, batchSize = 10) {
+  const quotes = {};
+  for(let i = 0; i < syms.length; i += batchSize) {
+    const batch = syms.slice(i, i + batchSize);
+    const results = await Promise.allSettled(batch.map(sym => fetchPickQuote(sym)));
+    results.forEach((r, j) => {
+      if(r.status === 'fulfilled' && r.value) {
+        quotes[batch[j]] = r.value;
+        picksQuoteCache[batch[j]] = r.value;
+      } else {
+        dbg(`${batch[j]} failed: ${r.reason?.message||r.status}`,'err');
+      }
+    });
+    // small pause between batches to avoid rate limiting
+    if(i + batchSize < syms.length) await new Promise(res => setTimeout(res, 300));
+  }
+  return quotes;
+}
+
 async function loadPicks() {
   picksLoaded = true;
   dbg('loadPicks() started');
-  const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
-  const pulseBar = document.getElementById('pulseBar');
-  if(pulseBar) pulseBar.innerHTML = '<div class="pulse-loading">Loading market data…</div>';
+  const allSyms = [...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
   ['col-ai','col-early','col-sectors'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.innerHTML = '<div class="picks-loading">Scanning…</div>';
   });
 
-  // Fetch all symbols in parallel via v8/chart (works without auth)
-  const results = await Promise.allSettled(allSyms.map(sym => fetchPickQuote(sym)));
-  const quotes = {};
-  let failCount = 0;
-  results.forEach((r, i) => {
-    if(r.status === 'fulfilled' && r.value) {
-      quotes[allSyms[i]] = r.value;
-      picksQuoteCache[allSyms[i]] = r.value;  // cache for tooltip
-    } else {
-      failCount++;
-      dbg(`${allSyms[i]} failed: ${r.reason?.message||r.status}`,'err');
-    }
-  });
+  const quotes = await fetchBatch(allSyms);
+  const failCount = allSyms.length - Object.keys(quotes).length;
   dbg(`loadPicks: ${Object.keys(quotes).length} OK, ${failCount} failed`, failCount>0?'warn':'ok');
 
   if(!Object.keys(quotes).length) {
-    if(pulseBar) pulseBar.innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ All requests failed — check proxy deployment</div>`;
     dbg('loadPicks: ALL symbols failed — proxy likely broken','err');
     return;
   }
