@@ -2853,7 +2853,8 @@ async function loadPicks() {
   const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
   document.getElementById('pulseBar').innerHTML = '<div class="pulse-loading">Loading market data…</div>';
   ['col-ai','col-early','col-sectors'].forEach(id => {
-    document.getElementById(id).innerHTML = '<div class="picks-loading">Scanning…</div>';
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = '<div class="picks-loading">Scanning…</div>';
   });
 
   // Fetch all symbols in parallel via v8/chart (works without auth)
@@ -2885,7 +2886,8 @@ async function loadPicks() {
   if(watchlistTickers.length) refreshWatchlist();
 
   const ts = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'America/New_York'});
-  document.getElementById('picksFooter').innerHTML =
+  const footer = document.getElementById('picksFooter');
+  if(footer) footer.innerHTML =
     `Updated ${ts} ET &nbsp;·&nbsp; Scores: momentum + volume spike + 52W position
      <button class="picks-refresh-btn" onclick="loadPicks()">↻ Refresh</button>
      <span style="margin-left:12px;color:var(--text3)">⚠ Technical signals only — not financial advice</span>`;
