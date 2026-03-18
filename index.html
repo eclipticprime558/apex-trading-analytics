@@ -982,8 +982,33 @@ body{
   </div>
   <!-- Market Pulse -->
   <div class="pulse-bar" id="pulseBar">
-    <div class="pulse-loading">Loading market data...</div>
+    <div class="pulse-loading">Add stocks to your watchlist to see them here</div>
   </div>
+  <!-- Picks Grid -->
+  <div class="picks-layout">
+    <div class="picks-col">
+      <div class="picks-col-hdr">
+        <span class="picks-col-title">⬡ AI Top Picks</span>
+        <span class="picks-col-sub">High conviction · Large &amp; Mid cap · Click any to load chart</span>
+      </div>
+      <div id="col-ai" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+    <div class="picks-col">
+      <div class="picks-col-hdr picks-col-hdr--radar">
+        <span class="picks-col-title picks-col-hdr--radar">◎ Early Entry Radar</span>
+        <span class="picks-col-sub">Small/Mid cap · Under $50 · Momentum &amp; volume spikes</span>
+      </div>
+      <div id="col-early" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+    <div class="picks-col">
+      <div class="picks-col-hdr picks-col-hdr--sector">
+        <span class="picks-col-title picks-col-hdr--sector">▦ Sector Trends</span>
+        <span class="picks-col-sub">ETF flows · Capital rotation · Macro signals</span>
+      </div>
+      <div id="col-sectors" class="picks-list"><div class="picks-loading">Scanning…</div></div>
+    </div>
+  </div>
+  <div class="picks-footer" id="picksFooter">⚠ Scores are technical momentum signals only — not financial advice. Always do your own research.</div>
 
   <!-- Market Intelligence -->
   <div class="intel-section" id="intelSection">
@@ -2894,21 +2919,30 @@ async function loadPicks() {
 }
 
 function renderPulseBar(quotes) {
+  // kept for internal use by loadPicks scoring — bar display uses renderWatchlistBar
+}
+
+function renderWatchlistBar() {
   const bar = document.getElementById('pulseBar');
-  bar.innerHTML = PULSE_SYMS.map(sym => {
-    const q = quotes[sym];
+  if(!bar) return;
+  if(!watchlistTickers.length) {
+    bar.innerHTML = '<div class="pulse-loading" style="color:var(--text3)">Add stocks to your watchlist to see them here</div>';
+    return;
+  }
+  const items = watchlistTickers.map(sym => {
+    const q = watchlistQuotes[sym];
     if(!q) return '';
     const price  = q.regularMarketPrice?.toFixed(2) ?? '—';
     const chg    = q.regularMarketChangePercent;
     const chgStr = chg != null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '—';
     const cls    = chg == null ? '' : chg >= 0 ? 'up' : 'dn';
-    const clickSym = sym.replace('^','%5E'); // keep ^ for VIX
-    return `<div class="pulse-item" onclick="loadPickStock('${sym}')" title="Click to open ${sym.replace('^','')} chart" style="cursor:pointer;">
-      <span class="pulse-sym">${sym.replace('^','')}</span>
+    return `<div class="pulse-item" onclick="loadPickStock('${sym}')" title="Click to open ${sym} chart" style="cursor:pointer;">
+      <span class="pulse-sym">${sym}</span>
       <span class="pulse-price">${price}</span>
       <span class="pulse-chg ${cls}">${chgStr}</span>
     </div>`;
-  }).join('');
+  }).filter(Boolean).join('');
+  bar.innerHTML = items || '<div class="pulse-loading" style="color:var(--text3)">Loading watchlist…</div>';
 }
 
 function calcQuickScore(q) {
@@ -3386,7 +3420,7 @@ function removeFromWatchlist(sym) {
 }
 
 async function refreshWatchlist() {
-  if(!watchlistTickers.length) return;
+  if(!watchlistTickers.length) { renderWatchlistBar(); return; }
   const container = document.getElementById('watchlistContainer');
   container.style.opacity = '0.55';
   const results = await Promise.allSettled(watchlistTickers.map(sym => fetchPickQuote(sym)));
@@ -3398,6 +3432,7 @@ async function refreshWatchlist() {
   });
   container.style.opacity = '1';
   renderWatchlist();
+  renderWatchlistBar();
 }
 
 function renderWatchlist(showLoading) {
