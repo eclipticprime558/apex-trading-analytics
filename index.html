@@ -3104,7 +3104,10 @@ document.addEventListener('mousemove', e => {
 function renderPicksCol(colId, tickers, quotes) {
   const col = document.getElementById(colId);
   if(!col) return;
-  const scored = tickers
+  const filtered = colId === 'col-early'
+    ? tickers.filter(sym => { const p = quotes[sym]?.regularMarketPrice; return !p || p <= 50; })
+    : tickers;
+  const scored = filtered
     .map(sym => ({ sym, q: quotes[sym], score: quotes[sym]?.technicalScore ?? 50 }))
     .sort((a,b) => b.score - a.score);
 
@@ -3322,6 +3325,7 @@ function addToWatchlistDirect(sym) {
   watchlistTickers.push(sym);
   saveWatchlist();
   renderWatchlist(true);
+  rerenderPicksCols();
   fetchPickQuote(sym).then(q => {
     if(q) {
       watchlistQuotes[sym] = q;
@@ -3414,6 +3418,13 @@ function removeFromWatchlist(sym) {
   delete watchlistQuotes[sym];
   saveWatchlist();
   renderWatchlist();
+  rerenderPicksCols();
+}
+
+function rerenderPicksCols() {
+  renderPicksCol('col-ai',      WATCHLISTS.ai,      picksQuoteCache);
+  renderPicksCol('col-early',   WATCHLISTS.early,   picksQuoteCache);
+  renderPicksCol('col-sectors', WATCHLISTS.sectors, picksQuoteCache);
 }
 
 async function refreshWatchlist() {
