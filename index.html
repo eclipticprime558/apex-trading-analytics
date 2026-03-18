@@ -3070,6 +3070,7 @@ document.addEventListener('mousemove', e => {
 
 function renderPicksCol(colId, tickers, quotes) {
   const col = document.getElementById(colId);
+  if(!col) return;
   const scored = tickers
     .map(sym => ({ sym, q: quotes[sym], score: quotes[sym]?.technicalScore ?? 50 }))
     .sort((a,b) => b.score - a.score);
