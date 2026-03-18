@@ -980,10 +980,6 @@ body{
     </div>
     <div id="watchlistContainer"><div class="watchlist-empty">No stocks tracked yet.<br>Type a ticker above and press Enter or click Add.</div></div>
   </div>
-  <!-- Market Pulse -->
-  <div class="pulse-bar" id="pulseBar">
-    <div class="pulse-loading">Add stocks to your watchlist to see them here</div>
-  </div>
   <!-- Picks Grid -->
   <div class="picks-layout">
     <div class="picks-col">
@@ -2876,7 +2872,8 @@ async function loadPicks() {
   picksLoaded = true;
   dbg('loadPicks() started');
   const allSyms = [...PULSE_SYMS, ...WATCHLISTS.ai, ...WATCHLISTS.early, ...WATCHLISTS.sectors];
-  document.getElementById('pulseBar').innerHTML = '<div class="pulse-loading">Loading market data…</div>';
+  const pulseBar = document.getElementById('pulseBar');
+  if(pulseBar) pulseBar.innerHTML = '<div class="pulse-loading">Loading market data…</div>';
   ['col-ai','col-early','col-sectors'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.innerHTML = '<div class="picks-loading">Scanning…</div>';
@@ -2898,7 +2895,7 @@ async function loadPicks() {
   dbg(`loadPicks: ${Object.keys(quotes).length} OK, ${failCount} failed`, failCount>0?'warn':'ok');
 
   if(!Object.keys(quotes).length) {
-    document.getElementById('pulseBar').innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ All requests failed — check proxy deployment</div>`;
+    if(pulseBar) pulseBar.innerHTML = `<div class="pulse-loading" style="color:var(--red)">⚠ All requests failed — check proxy deployment</div>`;
     dbg('loadPicks: ALL symbols failed — proxy likely broken','err');
     return;
   }
