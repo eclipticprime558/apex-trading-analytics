@@ -708,6 +708,31 @@ body{
   transition:color .15s,border-color .15s;
 }
 .watchlist-refresh-btn:hover{color:var(--text);border-color:var(--border2);}
+
+/* ── Track buttons (chart + pick cards) ── */
+.chart-track-btn{
+  background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);
+  color:var(--accent);font-size:11px;font-weight:600;
+  padding:4px 11px;border-radius:5px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+  white-space:nowrap;
+}
+.chart-track-btn:hover{background:rgba(88,166,255,.25);}
+.chart-track-btn.tracked{
+  background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);
+}
+.chart-track-btn.tracked:hover{background:rgba(63,185,80,.28);}
+.pick-track-btn{
+  margin-top:6px;width:100%;
+  background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);
+  color:var(--accent);font-size:10px;font-weight:600;
+  padding:3px 0;border-radius:4px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.pick-track-btn:hover{background:rgba(88,166,255,.22);}
+.pick-track-btn.tracked{
+  background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.35);color:var(--green);
+}
+.pick-track-btn.tracked:hover{background:rgba(63,185,80,.25);}
+
 .watchlist-empty{
   padding:28px;text-align:center;color:var(--text3);font-size:12px;
   background:var(--bg2);border:1px solid var(--border);border-radius:8px;
@@ -938,35 +963,27 @@ body{
 
 <!-- Market Picks View -->
 <div id="picksView" style="display:none">
+  <!-- Watchlist Section -->
+  <div class="watchlist-section" id="watchlistSection">
+    <div class="watchlist-header">
+      <div>
+        <div class="watchlist-title">★ Watchlist</div>
+        <div class="watchlist-sub">Your tracked stocks · Live scores · Click any row to open chart</div>
+      </div>
+      <div class="watchlist-add-row">
+        <input class="watchlist-input" id="wlInput" placeholder="Add ticker…" maxlength="12"
+               onkeydown="if(event.key==='Enter')addToWatchlist()"
+               oninput="this.value=this.value.toUpperCase().replace(/[^A-Z.^]/g,'')">
+        <button class="watchlist-add-btn" onclick="addToWatchlist()">+ Add</button>
+        <button class="watchlist-refresh-btn" onclick="refreshWatchlist()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="watchlistContainer"><div class="watchlist-empty">No stocks tracked yet.<br>Type a ticker above and press Enter or click Add.</div></div>
+  </div>
   <!-- Market Pulse -->
   <div class="pulse-bar" id="pulseBar">
     <div class="pulse-loading">Loading market data...</div>
   </div>
-  <!-- Picks Grid -->
-  <div class="picks-layout">
-    <div class="picks-col">
-      <div class="picks-col-hdr">
-        <span class="picks-col-title">⬡ AI Top Picks</span>
-        <span class="picks-col-sub">High conviction · Large &amp; Mid cap · Click any to load chart</span>
-      </div>
-      <div id="col-ai" class="picks-list"><div class="picks-loading">Scanning…</div></div>
-    </div>
-    <div class="picks-col">
-      <div class="picks-col-hdr picks-col-hdr--radar">
-        <span class="picks-col-title picks-col-hdr--radar">◎ Early Entry Radar</span>
-        <span class="picks-col-sub">Small/Mid cap · Under $50 · Momentum &amp; volume spikes</span>
-      </div>
-      <div id="col-early" class="picks-list"><div class="picks-loading">Scanning…</div></div>
-    </div>
-    <div class="picks-col">
-      <div class="picks-col-hdr picks-col-hdr--sector">
-        <span class="picks-col-title picks-col-hdr--sector">▦ Sector Trends</span>
-        <span class="picks-col-sub">ETF flows · Capital rotation · Macro signals</span>
-      </div>
-      <div id="col-sectors" class="picks-list"><div class="picks-loading">Scanning…</div></div>
-    </div>
-  </div>
-  <div class="picks-footer" id="picksFooter">⚠ Scores are technical momentum signals only — not financial advice. Always do your own research.</div>
 
   <!-- Market Intelligence -->
   <div class="intel-section" id="intelSection">
@@ -991,23 +1008,7 @@ body{
     </div>
   </div>
 
-  <!-- Watchlist Section -->
-  <div class="watchlist-section" id="watchlistSection">
-    <div class="watchlist-header">
-      <div>
-        <div class="watchlist-title">★ Watchlist</div>
-        <div class="watchlist-sub">Your tracked stocks · Live scores · Click any row to open chart</div>
-      </div>
-      <div class="watchlist-add-row">
-        <input class="watchlist-input" id="wlInput" placeholder="Add ticker…" maxlength="12"
-               onkeydown="if(event.key==='Enter')addToWatchlist()"
-               oninput="this.value=this.value.toUpperCase().replace(/[^A-Z.^]/g,'')">
-        <button class="watchlist-add-btn" onclick="addToWatchlist()">+ Add</button>
-        <button class="watchlist-refresh-btn" onclick="refreshWatchlist()">↻ Refresh</button>
-      </div>
-    </div>
-    <div id="watchlistContainer"><div class="watchlist-empty">No stocks tracked yet.<br>Type a ticker above and press Enter or click Add.</div></div>
-  </div>
+
 </div>
 
 <!-- Quote bar -->
@@ -1041,7 +1042,10 @@ body{
     <div class="panel">
       <div class="panel-hdr">
         <div class="panel-title" id="chartTitle">PRICE CHART</div>
-        <div style="font-size:11px;color:var(--text3)" id="chartSubtitle"></div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:11px;color:var(--text3)" id="chartSubtitle"></div>
+          <button id="chartTrackBtn" class="chart-track-btn" onclick="toggleTrackFromChart()" style="display:none">★ Track</button>
+        </div>
       </div>
       <div class="chart-toolbar" id="toolbar">
         <button class="toggle-btn on" data-ind="ma20" onclick="toggleInd('ma20',this)" title="MA20 — 20-period Moving Average. Price above = short-term uptrend. Acts as dynamic support/resistance."><span class="dot"></span>MA20</button>
@@ -1629,6 +1633,7 @@ async function loadData() {
     document.getElementById('quoteBar').style.display='flex';
     document.getElementById('chartTitle').textContent = `${ticker} — ${interval.toUpperCase()} / ${range.toUpperCase()}`;
     document.getElementById('chartSubtitle').textContent = companyName + (source==='Yahoo Finance'?' (Yahoo Finance)':'');
+    updateChartTrackBtn();
     startRefreshTimer();
     // Update URL so back button knows which stock we're on
     if(!_navSuppressPush) history.replaceState({view:'chart',ticker}, '', `#chart/${ticker}`);
@@ -3083,6 +3088,7 @@ function renderPicksCol(colId, tickers, quotes) {
     const hi = q.fiftyTwoWeekHigh, lo = q.fiftyTwoWeekLow, p = q.regularMarketPrice;
     const pos52 = (hi && lo && hi !== lo) ? Math.round(((p-lo)/(hi-lo))*100) : '—';
     const volLabel = (vol && avg && avg > 0) ? volRatio.toFixed(1) + 'x avg' : '—';
+    const isTracked = watchlistTickers.includes(sym);
     return `<div class="pick-card" onclick="loadPickStock('${sym}')">
       <div class="pick-sym">${sym}</div>
       <div class="pick-info">
@@ -3095,6 +3101,8 @@ function renderPicksCol(colId, tickers, quotes) {
           <div class="pick-vol-fill" style="width:${volBarW}%;background:${volBarC}"></div>
         </div>
         <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}</div>
+        <button class="pick-track-btn${isTracked?' tracked':''}"
+                onclick="event.stopPropagation();togglePickTrack('${sym}',this)">${isTracked?'✓ Tracked':'★ Track'}</button>
       </div>
       <div class="pick-score-wrap">
         <div class="pick-score ${pickCls(score)}"
@@ -3273,6 +3281,56 @@ let watchlistQuotes  = {};
 
 function saveWatchlist() {
   localStorage.setItem(WL_KEY, JSON.stringify(watchlistTickers));
+}
+
+function addToWatchlistDirect(sym) {
+  if(watchlistTickers.includes(sym)) return;
+  watchlistTickers.push(sym);
+  saveWatchlist();
+  renderWatchlist(true);
+  fetchPickQuote(sym).then(q => {
+    if(q) {
+      watchlistQuotes[sym] = q;
+      picksQuoteCache[sym] = q;
+    } else {
+      watchlistTickers = watchlistTickers.filter(t => t !== sym);
+      saveWatchlist();
+    }
+    renderWatchlist();
+  });
+}
+
+function toggleTrackFromChart() {
+  if(!ticker) return;
+  const btn = document.getElementById('chartTrackBtn');
+  if(watchlistTickers.includes(ticker)) {
+    removeFromWatchlist(ticker);
+    if(btn) { btn.textContent = '★ Track'; btn.classList.remove('tracked'); }
+  } else {
+    addToWatchlistDirect(ticker);
+    if(btn) { btn.textContent = '✓ Tracked'; btn.classList.add('tracked'); }
+  }
+}
+
+function togglePickTrack(sym, btn) {
+  if(watchlistTickers.includes(sym)) {
+    removeFromWatchlist(sym);
+    btn.textContent = '★ Track';
+    btn.classList.remove('tracked');
+  } else {
+    addToWatchlistDirect(sym);
+    btn.textContent = '✓ Tracked';
+    btn.classList.add('tracked');
+  }
+}
+
+function updateChartTrackBtn() {
+  const btn = document.getElementById('chartTrackBtn');
+  if(!btn) return;
+  btn.style.display = ticker ? 'inline-block' : 'none';
+  const tracked = ticker && watchlistTickers.includes(ticker);
+  btn.textContent = tracked ? '✓ Tracked' : '★ Track';
+  btn.classList.toggle('tracked', !!tracked);
 }
 
 function switchToWatchlist() {
