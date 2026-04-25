@@ -257,6 +257,14 @@ body{
   transition:border-color .15s,background .15s;
 }
 .preset-btn:hover{border-color:var(--accent);background:rgba(88,166,255,.1);color:var(--accent);}
+.mode-btn{
+  font-size:10px;font-weight:600;padding:3px 9px;border-radius:4px;
+  border:1px solid var(--border2);background:var(--bg3);
+  color:var(--text3);cursor:pointer;font-family:'Inter',sans-serif;
+  transition:border-color .15s,background .15s,color .15s;
+}
+.mode-btn:hover{border-color:var(--accent);color:var(--accent);}
+.mode-btn.on{border-color:var(--accent);background:rgba(88,166,255,.15);color:var(--accent);}
 .tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px;flex-shrink:0;}
 .tb-group-lbl{
   font-size:9px;letter-spacing:.8px;text-transform:uppercase;
@@ -1238,6 +1246,11 @@ body{
         <button class="preset-btn" onclick="setPreset('simple')" title="Clean view — candles + MA50 + Volume only">Simple</button>
         <button class="preset-btn" onclick="setPreset('analysis')" title="Full analysis — all indicators on">Analysis</button>
         <div class="tb-sep"></div>
+        <!-- Chart mode -->
+        <button class="mode-btn on" id="modeCandles" onclick="setChartMode('candles')" title="Candlestick chart">Candles</button>
+        <button class="mode-btn" id="modeLine" onclick="setChartMode('line')" title="Line chart — close price">Line</button>
+        <button class="mode-btn" id="modeArea" onclick="setChartMode('area')" title="Area chart — shaded close price">Area</button>
+        <div class="tb-sep"></div>
         <!-- Overlays -->
         <span class="tb-group-lbl">Overlays</span>
         <button class="toggle-btn" data-ind="ma20" onclick="toggleInd('ma20',this)" title="MA20 — 20-period Moving Average. Price above = short-term uptrend. Acts as dynamic support/resistance."><span class="dot"></span>MA20</button>
@@ -1486,6 +1499,7 @@ let viewCount = 80;  // how many candles to show
 let isDragging = false;
 let dragStartX = 0, dragStartView = 0;
 let hoverIdx = -1;
+let chartMode = 'candles'; // 'candles' | 'line' | 'area'
 let isSelecting = false, selStartX = 0, selCurX = 0;
 let liveRefreshTimer = null;
 let countdown = 30;
@@ -2395,6 +2409,21 @@ function setPreset(mode) {
   drawChart();
 }
 
+// Chart mode (Candles / Line / Area)
+function setChartMode(mode) {
+  chartMode = mode;
+  _syncModeButtons();
+  saveChartSettings();
+  drawChart();
+}
+function _syncModeButtons() {
+  ['candles','line','area'].forEach(m => {
+    const id = 'mode' + m.charAt(0).toUpperCase() + m.slice(1);
+    const btn = document.getElementById(id);
+    if(btn) btn.classList.toggle('on', chartMode === m);
+  });
+}
+
 // ── Chart settings persistence (saved per active profile) ──
 const CHART_IND_FALLBACK = 'apex_chart_ind';
 
@@ -2403,31 +2432,40 @@ function saveChartSettings() {
   if(name) {
     const profiles = loadProfiles();
     if(profiles[name]) {
-      profiles[name].chartInd = { ...ind };
+      profiles[name].chartInd  = { ...ind };
+      profiles[name].chartMode = chartMode;
       saveProfiles(profiles);
     }
   } else {
     localStorage.setItem(CHART_IND_FALLBACK, JSON.stringify(ind));
+    localStorage.setItem('apex_chart_mode', chartMode);
   }
 }
 
 function loadChartSettings() {
   const name = getActiveProfileName();
-  let saved = null;
+  let saved = null, savedMode = null;
   if(name) {
     const profiles = loadProfiles();
-    saved = profiles[name]?.chartInd || null;
+    saved     = profiles[name]?.chartInd  || null;
+    savedMode = profiles[name]?.chartMode || null;
   }
   if(!saved) {
     try { saved = JSON.parse(localStorage.getItem(CHART_IND_FALLBACK)); } catch(e) {}
   }
-  if(!saved) return;
-  // Merge saved into ind — preserves any new keys added since last save
-  Object.keys(ind).forEach(k => { if(k in saved) ind[k] = saved[k]; });
-  // Sync button visual states
-  document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
-    btn.classList.toggle('on', !!ind[btn.dataset.ind]);
-  });
+  if(!savedMode) savedMode = localStorage.getItem('apex_chart_mode');
+  if(saved) {
+    // Merge saved into ind — preserves any new keys added since last save
+    Object.keys(ind).forEach(k => { if(k in saved) ind[k] = saved[k]; });
+    // Sync button visual states
+    document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
+      btn.classList.toggle('on', !!ind[btn.dataset.ind]);
+    });
+  }
+  if(savedMode && ['candles','line','area'].includes(savedMode)) {
+    chartMode = savedMode;
+    _syncModeButtons();
+  }
 }
 
 // ═══════════════════════════════════════
@@ -2443,12 +2481,11 @@ function drawChart() {
 
   // Compute total height based on enabled panels
   const priceH  = 420;                    // taller — more breathing room
-  const volH    = ind.volume ? 70  : 0;
   const rsiH    = ind.rsi    ? 110 : 0;
   const macdH   = ind.macd   ? 110 : 0;
   const gapH    = 12; // gap between panels
   const PADS    = 4;
-  const H = priceH + volH + rsiH + macdH + (volH?gapH:0) + (rsiH?gapH:0) + (macdH?gapH:0) + 40;
+  const H = priceH + rsiH + macdH + (rsiH?gapH:0) + (macdH?gapH:0) + 40;
 
   canvas.width  = W * dpr;
   canvas.height = H * dpr;
@@ -2465,7 +2502,6 @@ function drawChart() {
   let curY = PAD_T;
   const panels = {};
   panels.price  = {y:curY, h:priceH}; curY+=priceH;
-  if(ind.volume){curY+=gapH; panels.vol={y:curY,h:volH};curY+=volH;}
   if(ind.rsi)   {curY+=gapH; panels.rsi={y:curY,h:rsiH};curY+=rsiH;}
   if(ind.macd)  {curY+=gapH; panels.macd={y:curY,h:macdH};curY+=macdH;}
 
@@ -2707,18 +2743,39 @@ function drawChart() {
   if(ind.ema9)  drawLine(ema9,  '#39c5cf', 1.2);
   if(ind.vwap)  drawLine(vwap,  'rgba(255,255,255,0.5)', 1, [4,3]);
 
-  // MA labels at edge
-  const maLabels=[
-    {arr:ma20,color:'#d29922',label:'MA20',show:ind.ma20},
-    {arr:ma50,color:'#fb8f44',label:'MA50',show:ind.ma50},
-    {arr:ma200,color:'#a371f7',label:'MA200',show:ind.ma200},
-    {arr:ema9, color:'#39c5cf',label:'EMA9',show:ind.ema9},
-  ];
-  ctx.textAlign='left';ctx.font='9px "JetBrains Mono"';
-  maLabels.filter(m=>m.show).forEach(m=>{
-    const v=m.arr.slice(viewStart,viewStart+viewCount).filter(x=>x!=null).pop();
-    if(v!=null){ctx.fillStyle=m.color;ctx.fillText(m.label,W-PAD_R+2,pY(v)+4);}
-  });
+  // ── Inline floating legend — pill row top-left of price panel ──
+  {
+    const legendItems=[
+      {arr:ma20,  color:'#d29922',       label:'MA20',  show:ind.ma20},
+      {arr:ma50,  color:'#fb8f44',       label:'MA50',  show:ind.ma50},
+      {arr:ma200, color:'#a371f7',       label:'MA200', show:ind.ma200},
+      {arr:ema9,  color:'#39c5cf',       label:'EMA9',  show:ind.ema9},
+      {arr:vwap,  color:'rgba(255,255,255,0.5)', label:'VWAP', show:ind.vwap},
+    ];
+    const active = legendItems.filter(m => m.show).map(m => {
+      const v = m.arr.slice(viewStart, viewStart+viewCount).filter(x=>x!=null).pop();
+      return v != null ? { ...m, val: v.toFixed(2) } : null;
+    }).filter(Boolean);
+    if(active.length) {
+      ctx.font = 'bold 9px "JetBrains Mono"';
+      let lx = PAD_L + 6;
+      const ly = pp.y + 14;
+      active.forEach(m => {
+        const text = `${m.label} ${m.val}`;
+        const tw   = ctx.measureText(text).width;
+        const pw   = tw + 10;
+        const ph   = 14;
+        ctx.fillStyle = 'rgba(13,17,23,0.72)';
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(lx-4, ly-10, pw, ph, 3);
+        else ctx.rect(lx-4, ly-10, pw, ph);
+        ctx.fill();
+        ctx.fillStyle = m.color;
+        ctx.fillText(text, lx, ly);
+        lx += pw + 4;
+      });
+    }
+  }
 
   // ── Trade Setup Lines ──
   if(ind.tradeLines && indicators.tradeSetup) {
@@ -2753,23 +2810,52 @@ function drawChart() {
     ctx.fillRect(PAD_L, Math.min(eY,tp1Y), W-PAD_L-PAD_R, Math.abs(eY-tp1Y));
   }
 
-  // Candles (historical)
-  visData.forEach((d,i)=>{
-    const x=toX(i);
-    const up=d.close>=d.open;
-    const col=up?'#3fb950':'#f85149';
-    ctx.strokeStyle=col;ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(x,pY(d.high));ctx.lineTo(x,pY(d.low));ctx.stroke();
-    const bodyTop=Math.min(pY(d.open),pY(d.close));
-    const bodyH=Math.max(1,Math.abs(pY(d.close)-pY(d.open)));
-    ctx.fillStyle=col;
-    ctx.fillRect(x-candleW/2,bodyTop,candleW,bodyH);
-    // Highlight hovered
-    if(i===hoverIdx){
-      ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;
-      ctx.strokeRect(x-candleW/2-1,bodyTop-1,candleW+2,bodyH+2);
+  // ── Price rendering — mode-dependent ──
+  if(chartMode === 'candles') {
+    visData.forEach((d,i)=>{
+      const x=toX(i);
+      const up=d.close>=d.open;
+      const col=up?'#3fb950':'#f85149';
+      ctx.strokeStyle=col;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(x,pY(d.high));ctx.lineTo(x,pY(d.low));ctx.stroke();
+      const bodyTop=Math.min(pY(d.open),pY(d.close));
+      const bodyH=Math.max(1,Math.abs(pY(d.close)-pY(d.open)));
+      ctx.fillStyle=col;
+      ctx.fillRect(x-candleW/2,bodyTop,candleW,bodyH);
+      if(i===hoverIdx){
+        ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;
+        ctx.strokeRect(x-candleW/2-1,bodyTop-1,candleW+2,bodyH+2);
+      }
+    });
+  } else if(chartMode === 'line' || chartMode === 'area') {
+    const lastClose = visData[visData.length-1]?.close;
+    const priceUp   = lastClose >= visData[0]?.close;
+    const lineCol   = priceUp ? '#3fb950' : '#f85149';
+    // Area fill
+    if(chartMode === 'area') {
+      const grad = ctx.createLinearGradient(0, pp.y, 0, pp.y+pp.h);
+      grad.addColorStop(0, priceUp ? 'rgba(63,185,80,0.22)' : 'rgba(248,81,73,0.22)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      visData.forEach((d,i)=>{ i===0 ? ctx.moveTo(toX(i),pY(d.close)) : ctx.lineTo(toX(i),pY(d.close)); });
+      ctx.lineTo(toX(visData.length-1), pp.y+pp.h);
+      ctx.lineTo(toX(0), pp.y+pp.h);
+      ctx.closePath();
+      ctx.fillStyle=grad;
+      ctx.fill();
     }
-  });
+    // Line
+    ctx.strokeStyle=lineCol;ctx.lineWidth=2;ctx.lineJoin='round';
+    ctx.beginPath();
+    visData.forEach((d,i)=>{ i===0 ? ctx.moveTo(toX(i),pY(d.close)) : ctx.lineTo(toX(i),pY(d.close)); });
+    ctx.stroke();
+    // Hover dot
+    if(hoverIdx>=0 && hoverIdx<visData.length){
+      const d=visData[hoverIdx];
+      ctx.beginPath();ctx.arc(toX(hoverIdx),pY(d.close),4,0,Math.PI*2);
+      ctx.fillStyle=lineCol;ctx.fill();
+    }
+  }
 
   // Forecast candles
   if(ind.pred) foreCast.forEach((d,fi)=>{
@@ -2826,12 +2912,6 @@ function drawChart() {
   });
 
   // ── Sub-panel backgrounds — visually separate oscillators from price ──
-  if(panels.vol){
-    ctx.fillStyle='rgba(22,27,34,0.7)';
-    ctx.fillRect(0,panels.vol.y-gapH,W,panels.vol.h+gapH);
-    ctx.strokeStyle='rgba(48,54,61,0.8)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(0,panels.vol.y);ctx.lineTo(W,panels.vol.y);ctx.stroke();
-  }
   if(panels.rsi){
     ctx.fillStyle='rgba(16,22,28,0.85)';
     ctx.fillRect(0,panels.rsi.y-gapH,W,panels.rsi.h+gapH);
@@ -2845,24 +2925,26 @@ function drawChart() {
     ctx.beginPath();ctx.moveTo(0,panels.macd.y);ctx.lineTo(W,panels.macd.y);ctx.stroke();
   }
 
-  // ── Volume panel ──
-  if(ind.volume&&panels.vol){
-    const vp=panels.vol;
-    const volMax=Math.max(...visData.map(d=>d.volume))||1;
-    const vY=(v)=>vp.y+vp.h-((v/volMax)*(vp.h-4));
-    ctx.fillStyle='rgba(139,148,158,0.5)';ctx.font='9px "JetBrains Mono"';ctx.textAlign='right';
-    ctx.fillText('VOL',PAD_L-5,vp.y+12);
-    // Avg vol line
-    const avgV=avg(rawData.map(d=>d.volume));
-    const avgVY=vY(avgV);
-    ctx.strokeStyle='rgba(210,153,34,0.3)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(PAD_L,avgVY);ctx.lineTo(W-PAD_R,avgVY);ctx.stroke();
-    ctx.setLineDash([]);
-    visData.forEach((d,i)=>{
-      const x=toX(i);const h=vp.y+vp.h-vY(d.volume);
-      ctx.fillStyle=d.close>=d.open?'rgba(63,185,80,0.3)':'rgba(248,81,73,0.3)';
-      ctx.fillRect(x-candleW/2,vY(d.volume),candleW,vp.y+vp.h-vY(d.volume));
+  // ── Volume — merged into bottom 22% of price panel ──
+  if(ind.volume && visData.length) {
+    const volZoneH = Math.round(pp.h * 0.22);
+    const volBaseY = pp.y + pp.h - PAD_B / 2;
+    const volTopY  = volBaseY - volZoneH;
+    const volMax   = Math.max(...visData.map(d=>d.volume)) || 1;
+    const vToY     = v => volBaseY - (v / volMax) * volZoneH;
+    visData.forEach((d,i) => {
+      ctx.fillStyle = d.close>=d.open ? 'rgba(63,185,80,0.15)' : 'rgba(248,81,73,0.15)';
+      const bh = volBaseY - vToY(d.volume);
+      ctx.fillRect(toX(i)-candleW/2, vToY(d.volume), candleW, bh);
     });
+    // Avg vol marker line
+    const avgV = avg(rawData.map(d=>d.volume));
+    ctx.strokeStyle='rgba(210,153,34,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(PAD_L,vToY(avgV));ctx.lineTo(W-PAD_R,vToY(avgV));ctx.stroke();
+    ctx.setLineDash([]);
+    // VOL label bottom-left
+    ctx.fillStyle='rgba(139,148,158,0.4)';ctx.font='9px "JetBrains Mono"';ctx.textAlign='left';
+    ctx.fillText('VOL',PAD_L+4,volBaseY-2);
   }
 
   // ── RSI panel ──
