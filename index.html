@@ -247,6 +247,21 @@ body{
 .toggle-btn[data-ind="macd"].on .dot{background:#f85149;}
 .toggle-btn[data-ind="pred"].on .dot{background:rgba(88,166,255,.7);}
 
+/* ── Toolbar presets + grouping ── */
+.preset-btn{
+  font-size:11px;font-weight:600;letter-spacing:.3px;
+  padding:4px 12px;border-radius:4px;
+  border:1px solid var(--border2);background:var(--bg3);
+  color:var(--text);cursor:pointer;font-family:'Inter',sans-serif;
+  transition:border-color .15s,background .15s;
+}
+.preset-btn:hover{border-color:var(--accent);background:rgba(88,166,255,.1);color:var(--accent);}
+.tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px;flex-shrink:0;}
+.tb-group-lbl{
+  font-size:9px;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--text3);padding:0 4px;white-space:nowrap;
+}
+
 /* ── Chart canvas wrap ── */
 .chart-outer{position:relative;cursor:crosshair;}
 #mainCanvas{display:block;width:100%;}
@@ -1218,20 +1233,32 @@ body{
         </div>
       </div>
       <div class="chart-toolbar" id="toolbar">
-        <button class="toggle-btn on" data-ind="ma20" onclick="toggleInd('ma20',this)" title="MA20 — 20-period Moving Average. Price above = short-term uptrend. Acts as dynamic support/resistance."><span class="dot"></span>MA20</button>
+        <!-- Preset buttons -->
+        <button class="preset-btn" onclick="setPreset('simple')" title="Clean view — candles + MA50 + Volume only">Simple</button>
+        <button class="preset-btn" onclick="setPreset('analysis')" title="Full analysis — all indicators on">Analysis</button>
+        <div class="tb-sep"></div>
+        <!-- Overlays -->
+        <span class="tb-group-lbl">Overlays</span>
+        <button class="toggle-btn" data-ind="ma20" onclick="toggleInd('ma20',this)" title="MA20 — 20-period Moving Average. Price above = short-term uptrend. Acts as dynamic support/resistance."><span class="dot"></span>MA20</button>
         <button class="toggle-btn on" data-ind="ma50" onclick="toggleInd('ma50',this)" title="MA50 — 50-period Moving Average. Most-watched trend line. Crossing above = bullish, below = bearish."><span class="dot"></span>MA50</button>
         <button class="toggle-btn" data-ind="ma200" onclick="toggleInd('ma200',this)" title="MA200 — 200-period Moving Average. The long-term trend line. Price above = bull market, below = bear market."><span class="dot"></span>MA200</button>
         <button class="toggle-btn" data-ind="ema9" onclick="toggleInd('ema9',this)" title="EMA9 — 9-period Exponential Moving Average. Reacts faster than MA to recent price. Great for short-term entries."><span class="dot"></span>EMA9</button>
-        <button class="toggle-btn" data-ind="bb" onclick="toggleInd('bb',this)" title="Bollinger Bands — Upper/lower bands = 2 standard deviations from the 20-day MA. Near upper = overbought. Near lower = oversold. Squeeze = breakout incoming."><span class="dot"></span>Bollinger</button>
+        <button class="toggle-btn" data-ind="bb" onclick="toggleInd('bb',this)" title="Bollinger Bands — Upper/lower bands = 2 standard deviations from the 20-day MA. Near upper = overbought. Near lower = oversold. Squeeze = breakout incoming."><span class="dot"></span>BB</button>
         <button class="toggle-btn" data-ind="vwap" onclick="toggleInd('vwap',this)" title="VWAP — Volume Weighted Average Price. The price institutions use as benchmark. Price above VWAP = bullish bias. Used heavily by day traders."><span class="dot"></span>VWAP</button>
+        <div class="tb-sep"></div>
+        <!-- Oscillators -->
+        <span class="tb-group-lbl">Oscillators</span>
         <button class="toggle-btn on" data-ind="volume" onclick="toggleInd('volume',this)" title="Volume — Number of shares traded. High volume = strong conviction. Volume spike on a move = more reliable signal."><span class="dot"></span>Volume</button>
-        <button class="toggle-btn on" data-ind="rsi" onclick="toggleInd('rsi',this)" title="RSI (14) — Relative Strength Index. Measures speed of price movement. Above 70 = overbought (may reverse). Below 30 = oversold (may bounce). 50 = neutral."><span class="dot"></span>RSI</button>
-        <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)" title="MACD — Moving Average Convergence Divergence. When MACD line crosses above signal line = buy signal. Below = sell. Histogram shows momentum strength."><span class="dot"></span>MACD</button>
-        <button class="toggle-btn on" data-ind="pred" onclick="toggleInd('pred',this)" title="Forecast — 3 projected candles based on ATR volatility + RSI momentum + MACD direction. Shows probability range, not a guarantee."><span class="dot"></span>Forecast</button>
-        <button class="toggle-btn on" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)" title="Trade Lines — Shows Entry, Stop Loss, and Take Profit levels on the chart. Blue = entry, Red = stop loss, Green = TP1/2/3."><span class="dot"></span>Trade Lines</button>
-        <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
-        <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">⬚ Range Zoom</button>
-        <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">↩ Reset</button>
+        <button class="toggle-btn" data-ind="rsi" onclick="toggleInd('rsi',this)" title="RSI (14) — Relative Strength Index. Above 70 = overbought (may reverse). Below 30 = oversold (may bounce). 50 = neutral."><span class="dot"></span>RSI</button>
+        <button class="toggle-btn" data-ind="macd" onclick="toggleInd('macd',this)" title="MACD — Moving Average Convergence Divergence. MACD line crossing above signal = buy signal. Below = sell. Histogram shows momentum strength."><span class="dot"></span>MACD</button>
+        <div class="tb-sep"></div>
+        <!-- Advanced -->
+        <span class="tb-group-lbl">Advanced</span>
+        <button class="toggle-btn" data-ind="pred" onclick="toggleInd('pred',this)" title="Forecast — 3 projected candles based on ATR volatility + RSI momentum + MACD direction. Shows probability range, not a guarantee."><span class="dot"></span>Forecast</button>
+        <button class="toggle-btn" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)" title="Trade Lines — Entry, Stop Loss, and Take Profit levels on the chart."><span class="dot"></span>Levels</button>
+        <div class="tb-sep"></div>
+        <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">&#8862; Zoom</button>
+        <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">&#8617; Reset</button>
       </div>
       <div class="chart-outer" id="chartOuter">
         <canvas id="mainCanvas"></canvas>
@@ -1444,9 +1471,10 @@ let ticker      = 'AAPL';
 let companyName = '';
 let lastPrice   = null;
 let indicators  = {};
+// Default: clean view — just MA50 + Volume. User can add more via toolbar.
 let ind = {
-  ma20:true, ma50:true, ma200:false, ema9:false,
-  bb:false, vwap:false, volume:true, rsi:true, macd:false, pred:true, tradeLines:true
+  ma20:false, ma50:true, ma200:false, ema9:false,
+  bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false
 };
 // Chart view state
 let viewStart = 0;   // index of first visible candle
@@ -2348,6 +2376,21 @@ function toggleInd(key, btn) {
   drawChart();
 }
 
+// Preset modes — one-click chart configurations
+function setPreset(mode) {
+  if(mode === 'simple') {
+    ind = { ma20:false, ma50:true, ma200:false, ema9:false, bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false };
+  } else if(mode === 'analysis') {
+    ind = { ma20:true, ma50:true, ma200:false, ema9:false, bb:true, vwap:false, volume:true, rsi:true, macd:true, pred:false, tradeLines:true };
+  }
+  // Sync toggle button states
+  document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
+    const key = btn.dataset.ind;
+    btn.classList.toggle('on', !!ind[key]);
+  });
+  drawChart();
+}
+
 // ═══════════════════════════════════════
 //  CHART DRAWING
 // ═══════════════════════════════════════
@@ -2360,11 +2403,11 @@ function drawChart() {
   const W   = outer.clientWidth||900;
 
   // Compute total height based on enabled panels
-  const priceH  = 340;
-  const volH    = ind.volume ? 80 : 0;
-  const rsiH    = ind.rsi    ? 100: 0;
-  const macdH   = ind.macd   ? 100: 0;
-  const gapH    = 8; // gap between panels
+  const priceH  = 420;                    // taller — more breathing room
+  const volH    = ind.volume ? 70  : 0;
+  const rsiH    = ind.rsi    ? 110 : 0;
+  const macdH   = ind.macd   ? 110 : 0;
+  const gapH    = 12; // gap between panels
   const PADS    = 4;
   const H = priceH + volH + rsiH + macdH + (volH?gapH:0) + (rsiH?gapH:0) + (macdH?gapH:0) + 40;
 
@@ -2428,18 +2471,18 @@ function drawChart() {
   const pRange = pMax-pMin||1;
   const pY  = (p) => pp.y + pp.h - ((p-pMin)/pRange)*(pp.h-PAD_B) - PAD_B/2;
 
-  // Grid
+  // Grid — very subtle, like TradingView/Google Finance
   function drawGrid(panel, count=6) {
-    ctx.strokeStyle='rgba(48,54,61,0.6)';ctx.lineWidth=1;
-    for(let i=0;i<=count;i++){
+    ctx.strokeStyle='rgba(48,54,61,0.35)';ctx.lineWidth=1;
+    for(let i=1;i<count;i++){
       const y=panel.y+panel.h*(i/count);
       ctx.beginPath();ctx.moveTo(PAD_L,y);ctx.lineTo(W-PAD_R,y);ctx.stroke();
     }
-    // Vertical grid
-    const lEvery=Math.max(1,Math.floor(totalBars/8));
-    for(let i=0;i<visData.length;i+=lEvery){
+    // Vertical grid — fewer lines
+    const lEvery=Math.max(1,Math.floor(totalBars/6));
+    for(let i=lEvery;i<visData.length;i+=lEvery){
       const x=toX(i);
-      ctx.beginPath();ctx.moveTo(x,pp.y);ctx.lineTo(x,pp.y+pp.h);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,panel.y);ctx.lineTo(x,panel.y+panel.h);ctx.stroke();
     }
   }
   drawGrid(pp);
@@ -2617,6 +2660,36 @@ function drawChart() {
     ctx.setLineDash([]);
   });
 
+  // ── Current price line + badge (like Google Finance / NASDAQ) ──
+  const currentClose = rawData[rawData.length-1].close;
+  const prevClose    = rawData.length>1 ? rawData[rawData.length-2].close : currentClose;
+  const priceUp      = currentClose >= prevClose;
+  const priceLineY   = pY(currentClose);
+  if(priceLineY >= pp.y && priceLineY <= pp.y+pp.h) {
+    const priceColor = priceUp ? '#3fb950' : '#f85149';
+    // Dashed horizontal line at current price
+    ctx.save();
+    ctx.strokeStyle = priceUp ? 'rgba(63,185,80,0.55)' : 'rgba(248,81,73,0.55)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(PAD_L,priceLineY);ctx.lineTo(W-PAD_R,priceLineY);ctx.stroke();
+    ctx.setLineDash([]);
+    // Price badge pill on right axis
+    const badgeText = '$'+currentClose.toFixed(2);
+    ctx.font='bold 11px "JetBrains Mono"';
+    const tw = ctx.measureText(badgeText).width;
+    const bw = tw+14, bh = 18, br = 4;
+    const bx = W-PAD_R+2, by = priceLineY-bh/2;
+    ctx.fillStyle = priceColor;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, br);
+    ctx.fill();
+    ctx.fillStyle = '#0d1117';
+    ctx.textAlign='left';
+    ctx.fillText(badgeText, bx+7, priceLineY+4);
+    ctx.restore();
+  }
+
   // X-axis labels
   ctx.fillStyle='rgba(139,148,158,0.7)';ctx.font='9px "JetBrains Mono"';ctx.textAlign='center';
   const labelEvery=Math.max(1,Math.floor(totalBars/10));
@@ -2625,6 +2698,26 @@ function drawChart() {
       ctx.fillText(d.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}),toX(i),pp.y+pp.h-2);
     }
   });
+
+  // ── Sub-panel backgrounds — visually separate oscillators from price ──
+  if(panels.vol){
+    ctx.fillStyle='rgba(22,27,34,0.7)';
+    ctx.fillRect(0,panels.vol.y-gapH,W,panels.vol.h+gapH);
+    ctx.strokeStyle='rgba(48,54,61,0.8)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,panels.vol.y);ctx.lineTo(W,panels.vol.y);ctx.stroke();
+  }
+  if(panels.rsi){
+    ctx.fillStyle='rgba(16,22,28,0.85)';
+    ctx.fillRect(0,panels.rsi.y-gapH,W,panels.rsi.h+gapH);
+    ctx.strokeStyle='rgba(48,54,61,0.8)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,panels.rsi.y);ctx.lineTo(W,panels.rsi.y);ctx.stroke();
+  }
+  if(panels.macd){
+    ctx.fillStyle='rgba(16,22,28,0.85)';
+    ctx.fillRect(0,panels.macd.y-gapH,W,panels.macd.h+gapH);
+    ctx.strokeStyle='rgba(48,54,61,0.8)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,panels.macd.y);ctx.lineTo(W,panels.macd.y);ctx.stroke();
+  }
 
   // ── Volume panel ──
   if(ind.volume&&panels.vol){
@@ -3456,6 +3549,7 @@ window.addEventListener('load',()=>{
   dbg(`Proxy endpoint: /api/proxy`);
   setupChartEvents();
   _updateProfileBtn();
+  _updateWatchlistHeader();
   // Restore from URL hash if present (e.g. #chart/AAPL)
   const hash = location.hash;
   const chartMatch = hash.match(/^#chart\/(.+)$/);
@@ -3556,6 +3650,7 @@ function saveAndApplyProfile() {
   saveWatchlist();
   closeProfileModal();
   _updateProfileBtn();
+  _updateWatchlistHeader();
   refreshWatchlist();
   rerenderPicksCols();
 }
@@ -3578,6 +3673,13 @@ function _updateProfileBtn() {
   const btn = document.getElementById('profileBtn');
   if(btn) btn.textContent = name ? `\u{1F464} ${name}` : '\u{1F464} Profile';
 }
+function _updateWatchlistHeader() {
+  const name = getActiveProfileName();
+  const subEl = document.querySelector('.watchlist-sub');
+  if(subEl) subEl.textContent = name
+    ? `Profile: ${name} \u00B7 ${watchlistTickers.length} ticker${watchlistTickers.length!==1?'s':''} \u00B7 Click any row to open chart`
+    : 'Your tracked stocks \u00B7 Live scores \u00B7 Click any row to open chart';
+}
 // Enter key shortcuts in modal inputs
 document.addEventListener('keydown', e => {
   if(e.key==='Enter' && document.activeElement?.id==='profileTickerInput') addProfileTicker();
@@ -3588,11 +3690,29 @@ document.addEventListener('keydown', e => {
 //  WATCHLIST
 // ═══════════════════════════════════════
 const WL_KEY = 'apex_watchlist_v1';
-let watchlistTickers = JSON.parse(localStorage.getItem(WL_KEY) || '[]');
+// Bootstrap watchlistTickers: prefer active profile's list, fall back to legacy WL_KEY
+function _initWatchlistTickers() {
+  const name = getActiveProfileName();
+  if(name) {
+    const profiles = loadProfiles();
+    if(profiles[name]) return profiles[name].tickers || [];
+  }
+  return JSON.parse(localStorage.getItem(WL_KEY) || '[]');
+}
+let watchlistTickers = _initWatchlistTickers();
 let watchlistQuotes  = {};
 
 function saveWatchlist() {
   localStorage.setItem(WL_KEY, JSON.stringify(watchlistTickers));
+  // Write-through to active profile so Track buttons always persist to the profile
+  const name = getActiveProfileName();
+  if(name) {
+    const profiles = loadProfiles();
+    if(profiles[name]) {
+      profiles[name].tickers = [...watchlistTickers];
+      saveProfiles(profiles);
+    }
+  }
 }
 
 function addToWatchlistDirect(sym) {
