@@ -2377,22 +2377,57 @@ function switchTab(id, el) {
 function toggleInd(key, btn) {
   ind[key] = !ind[key];
   btn.classList.toggle('on', ind[key]);
+  saveChartSettings();
   drawChart();
 }
 
 // Preset modes — one-click chart configurations
 function setPreset(mode) {
   if(mode === 'simple') {
-    ind = { ma20:false, ma50:true, ma200:false, ema9:false, bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false };
+    ind = { ma20:false, ma50:true, ma200:false, ema9:false, bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false, fib:false };
   } else if(mode === 'analysis') {
-    ind = { ma20:true, ma50:true, ma200:false, ema9:false, bb:true, vwap:false, volume:true, rsi:true, macd:true, pred:false, tradeLines:true };
+    ind = { ma20:true, ma50:true, ma200:false, ema9:false, bb:true, vwap:false, volume:true, rsi:true, macd:true, pred:false, tradeLines:true, fib:false };
   }
-  // Sync toggle button states
   document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
-    const key = btn.dataset.ind;
-    btn.classList.toggle('on', !!ind[key]);
+    btn.classList.toggle('on', !!ind[btn.dataset.ind]);
   });
+  saveChartSettings();
   drawChart();
+}
+
+// ── Chart settings persistence (saved per active profile) ──
+const CHART_IND_FALLBACK = 'apex_chart_ind';
+
+function saveChartSettings() {
+  const name = getActiveProfileName();
+  if(name) {
+    const profiles = loadProfiles();
+    if(profiles[name]) {
+      profiles[name].chartInd = { ...ind };
+      saveProfiles(profiles);
+    }
+  } else {
+    localStorage.setItem(CHART_IND_FALLBACK, JSON.stringify(ind));
+  }
+}
+
+function loadChartSettings() {
+  const name = getActiveProfileName();
+  let saved = null;
+  if(name) {
+    const profiles = loadProfiles();
+    saved = profiles[name]?.chartInd || null;
+  }
+  if(!saved) {
+    try { saved = JSON.parse(localStorage.getItem(CHART_IND_FALLBACK)); } catch(e) {}
+  }
+  if(!saved) return;
+  // Merge saved into ind — preserves any new keys added since last save
+  Object.keys(ind).forEach(k => { if(k in saved) ind[k] = saved[k]; });
+  // Sync button visual states
+  document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
+    btn.classList.toggle('on', !!ind[btn.dataset.ind]);
+  });
 }
 
 // ═══════════════════════════════════════
@@ -3641,6 +3676,7 @@ window.addEventListener('load',()=>{
   setupChartEvents();
   _updateProfileBtn();
   _updateWatchlistHeader();
+  loadChartSettings(); // restore saved indicator toggles for active profile
   // Restore from URL hash if present (e.g. #chart/AAPL)
   const hash = location.hash;
   const chartMatch = hash.match(/^#chart\/(.+)$/);
@@ -3733,15 +3769,18 @@ function _removePrTicker(sym) {
 function saveAndApplyProfile() {
   if(!_prDraft.name) { alert('Please create or select a profile first.'); return; }
   const profiles = loadProfiles();
-  profiles[_prDraft.name] = { tickers: [..._prDraft.tickers] };
+  // Merge tickers into existing profile — preserve chartInd and any other stored data
+  profiles[_prDraft.name] = { ...(profiles[_prDraft.name] || {}), tickers: [..._prDraft.tickers] };
   saveProfiles(profiles);
   setActiveProfileName(_prDraft.name);
-  // Load the profile's tickers into the watchlist
   watchlistTickers = [..._prDraft.tickers];
   saveWatchlist();
   closeProfileModal();
   _updateProfileBtn();
   _updateWatchlistHeader();
+  // Restore this profile's chart indicator settings
+  loadChartSettings();
+  if(rawData.length) drawChart();
   refreshWatchlist();
   rerenderPicksCols();
 }
