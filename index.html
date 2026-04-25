@@ -895,6 +895,102 @@ body{
 }
 .key-indicator.set{background:var(--green-bg);color:var(--green);border:1px solid rgba(63,185,80,.3);}
 .key-indicator.unset{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,81,73,.3);}
+
+/* ── Score methodology banner ── */
+.score-method-bar{
+  background:rgba(88,166,255,.06);border-bottom:1px solid var(--border);
+  padding:6px 20px;font-size:10px;color:var(--text3);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.score-method-bar b{color:var(--text2);}
+.smf{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:3px;padding:2px 7px;font-size:9px;color:var(--text2);
+  font-family:'JetBrains Mono',monospace;white-space:nowrap;
+}
+
+/* ── Inline score factor tags on pick cards ── */
+.pick-factors{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+.pft{
+  font-size:8px;padding:1px 5px;border-radius:3px;letter-spacing:.2px;
+  white-space:nowrap;font-family:'JetBrains Mono',monospace;
+}
+.pft.pos{background:rgba(63,185,80,.15);color:var(--green);}
+.pft.neg{background:rgba(248,81,73,.15);color:var(--red);}
+.pft.neu{background:var(--bg3);color:var(--text3);}
+
+/* ── User Profile modal ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal-box{
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+  padding:24px;width:500px;max-width:95vw;max-height:85vh;overflow-y:auto;
+  box-shadow:0 16px 60px rgba(0,0,0,.65);
+}
+.modal-title{
+  font-size:15px;font-weight:600;color:var(--text);margin-bottom:18px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-close{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:18px;padding:0 4px;line-height:1;
+}
+.modal-close:hover{color:var(--text);}
+.modal-section{margin-bottom:18px;}
+.modal-lbl{
+  font-size:10px;color:var(--text3);letter-spacing:.7px;
+  text-transform:uppercase;margin-bottom:6px;
+}
+.modal-input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);font-family:'Inter',sans-serif;font-size:13px;
+  padding:8px 12px;border-radius:6px;outline:none;transition:border-color .2s;
+}
+.modal-input:focus{border-color:var(--accent);}
+.modal-row{display:flex;gap:8px;margin-top:6px;}
+.modal-btn-pri{
+  background:var(--accent);color:#0d1117;border:none;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:600;
+  padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap;
+}
+.modal-btn-pri:hover{opacity:.85;}
+.modal-btn-sec{
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  font-family:'Inter',sans-serif;font-size:12px;
+  padding:8px 14px;border-radius:6px;cursor:pointer;
+}
+.modal-btn-sec:hover{border-color:var(--accent);color:var(--accent);}
+.modal-btn-danger{
+  background:transparent;border:1px solid rgba(248,81,73,.4);color:var(--red);
+  font-family:'Inter',sans-serif;font-size:11px;
+  padding:6px 12px;border-radius:6px;cursor:pointer;
+}
+.modal-btn-danger:hover{background:var(--red-bg);}
+.wl-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;}
+.wl-tag{
+  display:flex;align-items:center;gap:5px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:4px;padding:3px 10px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);
+}
+.wl-tag-x{
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:13px;padding:0;line-height:1;
+}
+.wl-tag-x:hover{color:var(--red);}
+.profile-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.profile-chip{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:5px;padding:5px 12px;font-size:11px;cursor:pointer;
+  color:var(--text2);transition:border-color .15s,color .15s;
+}
+.profile-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.08);}
+.profile-chip:hover{border-color:var(--accent);color:var(--accent);}
+.modal-divider{height:1px;background:var(--border);margin:18px 0;}
+.modal-hint{font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5;}
 </style>
 </head>
 <body>
@@ -902,6 +998,47 @@ body{
 
 <div id="loading"><div id="loadingBar"></div></div>
 <div id="scoreTooltip"></div>
+
+<!-- User Profile Modal -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>&#128100; Profiles &amp; Watchlists</span>
+      <button class="modal-close" onclick="closeProfileModal()">&#10005;</button>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-lbl">Select Profile</div>
+      <div class="profile-chips" id="profileChips"><span style="font-size:11px;color:var(--text3)">No profiles yet.</span></div>
+      <div class="modal-row">
+        <input class="modal-input" id="newProfileName" placeholder="New profile name (e.g. Swing Trades)" style="flex:1;">
+        <button class="modal-btn-pri" onclick="createProfile()">+ Create</button>
+      </div>
+    </div>
+
+    <div class="modal-divider"></div>
+
+    <div class="modal-section">
+      <div class="modal-lbl">Watchlist for: <span id="activeProfileLabel" style="color:var(--accent);text-transform:none;letter-spacing:0;">—</span></div>
+      <div class="modal-row">
+        <input class="modal-input" id="profileTickerInput" placeholder="Add tickers: AAPL, MSFT, PLTR…" style="flex:1;text-transform:uppercase;">
+        <button class="modal-btn-pri" onclick="addProfileTicker()">+ Add</button>
+      </div>
+      <div class="modal-hint">Separate multiple tickers with commas or spaces. These sync with your &#9733; Watchlist tab.</div>
+      <div class="wl-tags" id="profileTagContainer"></div>
+    </div>
+
+    <div class="modal-divider"></div>
+
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+      <button class="modal-btn-danger" onclick="deleteActiveProfile()">&#128465; Delete Profile</button>
+      <div style="display:flex;gap:8px;">
+        <button class="modal-btn-sec" onclick="closeProfileModal()">Cancel</button>
+        <button class="modal-btn-pri" onclick="saveAndApplyProfile()">&#10003; Save &amp; Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Header -->
 <header class="header">
@@ -930,6 +1067,7 @@ body{
   </select>
   <button class="btn-load" onclick="loadData()">▶ Load</button>
   <button class="btn-outline" onclick="exportCSV()">↓ Export</button>
+  <button class="btn-outline" onclick="openProfileModal()" id="profileBtn" title="Manage named profiles &amp; watchlists">&#128100; Profile</button>
 
   <div class="hdr-right">
     <div class="market-badge closed" id="marketBadge">
@@ -963,6 +1101,17 @@ body{
 
 <!-- Market Picks View -->
 <div id="picksView" style="display:none">
+  <!-- Score methodology — always visible so picks are never opaque -->
+  <div class="score-method-bar">
+    <b>Score formula:</b>
+    <span class="smf">RSI &#177;18</span>
+    <span class="smf">MACD &#177;26</span>
+    <span class="smf">MA20/MA50 &#177;16</span>
+    <span class="smf">5D Momentum &#177;10</span>
+    <span class="smf">Volume &#177;8</span>
+    <span class="smf">Bollinger &#177;10</span>
+    <span style="margin-left:4px;">Base 50 + live data factors = 0&#8211;100. Hover any score circle for full breakdown.</span>
+  </div>
   <!-- Watchlist Section -->
   <div class="watchlist-section" id="watchlistSection">
     <div class="watchlist-header">
@@ -2840,7 +2989,7 @@ async function fetchPickQuote(sym) {
   }
 
   // Run the SAME scoring engine used by the Chart view
-  const { score, label } = calcSignalScore(candles);
+  const { score, label, factors } = calcSignalScore(candles);
 
   const highs   = candles.map(c => c.high);
   const lows    = candles.map(c => c.low);
@@ -2864,6 +3013,7 @@ async function fetchPickQuote(sym) {
     fiftyTwoWeekLow: w52Low,
     technicalScore: score,    // from same engine as Chart view
     technicalLabel: label,
+    technicalFactors: factors, // top factors — shown inline on pick cards
     _candles: candles,        // stored for tooltip factor breakdown
   };
 }
@@ -3131,6 +3281,13 @@ function renderPicksCol(colId, tickers, quotes) {
     const pos52 = (hi && lo && hi !== lo) ? Math.round(((p-lo)/(hi-lo))*100) : '—';
     const volLabel = (vol && avg && avg > 0) ? volRatio.toFixed(1) + 'x avg' : '—';
     const isTracked = watchlistTickers.includes(sym);
+    // Top 2 score factors — inline so picks are never opaque
+    const topFactors = (q.technicalFactors || []).slice(0, 2);
+    const factorHtml = topFactors.map(f => {
+      const cls = f.pts > 0 ? 'pos' : f.pts < 0 ? 'neg' : 'neu';
+      const pts = f.pts > 0 ? '+'+f.pts : f.pts === 0 ? '\u00B10' : f.pts;
+      return `<span class="pft ${cls}" title="${f.detail}">${f.icon} ${f.label} ${pts}</span>`;
+    }).join('');
     return `<div class="pick-card" onclick="loadPickStock('${sym}')">
       <div class="pick-sym">${sym}</div>
       <div class="pick-info">
@@ -3143,6 +3300,7 @@ function renderPicksCol(colId, tickers, quotes) {
           <div class="pick-vol-fill" style="width:${volBarW}%;background:${volBarC}"></div>
         </div>
         <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}</div>
+        ${factorHtml ? `<div class="pick-factors">${factorHtml}</div>` : ''}
         <button class="pick-track-btn${isTracked?' tracked':''}"
                 onclick="event.stopPropagation();togglePickTrack('${sym}',this)">${isTracked?'✓ Tracked':'★ Track'}</button>
       </div>
@@ -3297,6 +3455,7 @@ window.addEventListener('load',()=>{
   dbg('Page loaded — initializing APEX');
   dbg(`Proxy endpoint: /api/proxy`);
   setupChartEvents();
+  _updateProfileBtn();
   // Restore from URL hash if present (e.g. #chart/AAPL)
   const hash = location.hash;
   const chartMatch = hash.match(/^#chart\/(.+)$/);
@@ -3313,6 +3472,117 @@ window.addEventListener('load',()=>{
   }
 });
 window.addEventListener('resize',()=>{if(rawData.length)drawChart();});
+
+// ═══════════════════════════════════════
+//  USER PROFILES
+// ═══════════════════════════════════════
+const PROFILES_KEY  = 'apex_profiles_v1';
+const ACTIVE_PR_KEY = 'apex_active_profile';
+
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem(PROFILES_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveProfiles(p) { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); }
+function getActiveProfileName() { return localStorage.getItem(ACTIVE_PR_KEY) || null; }
+function setActiveProfileName(n) { localStorage.setItem(ACTIVE_PR_KEY, n); }
+
+// Draft state for modal editing
+let _prDraft = { name: '', tickers: [] };
+
+function openProfileModal() {
+  const profiles = loadProfiles();
+  const active = getActiveProfileName();
+  _prDraft = active && profiles[active]
+    ? { name: active, tickers: [...(profiles[active].tickers || [])] }
+    : { name: active || '', tickers: [] };
+  _renderProfileModal();
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.remove('open');
+}
+function _renderProfileModal() {
+  const profiles = loadProfiles();
+  const names = Object.keys(profiles);
+  document.getElementById('profileChips').innerHTML = names.length
+    ? names.map(n => `<div class="profile-chip${n===_prDraft.name?' active':''}" onclick="_switchProfileDraft('${n}')">${n}</div>`).join('')
+    : '<span style="font-size:11px;color:var(--text3)">No profiles yet — create one below.</span>';
+  document.getElementById('activeProfileLabel').textContent = _prDraft.name || '(none)';
+  _renderProfileTags();
+}
+function _renderProfileTags() {
+  const c = document.getElementById('profileTagContainer');
+  c.innerHTML = _prDraft.tickers.length
+    ? _prDraft.tickers.map(s => `<div class="wl-tag">${s}<button class="wl-tag-x" onclick="_removePrTicker('${s}')">&#215;</button></div>`).join('')
+    : '<span style="font-size:11px;color:var(--text3)">No tickers added yet.</span>';
+}
+function _switchProfileDraft(name) {
+  const profiles = loadProfiles();
+  _prDraft = { name, tickers: [...(profiles[name]?.tickers || [])] };
+  _renderProfileModal();
+}
+function createProfile() {
+  const name = document.getElementById('newProfileName').value.trim();
+  if(!name) return;
+  const profiles = loadProfiles();
+  if(!profiles[name]) profiles[name] = { tickers: [] };
+  saveProfiles(profiles);
+  document.getElementById('newProfileName').value = '';
+  _prDraft = { name, tickers: [...(profiles[name].tickers || [])] };
+  _renderProfileModal();
+}
+function addProfileTicker() {
+  const raw = document.getElementById('profileTickerInput').value.trim().toUpperCase();
+  if(!raw) return;
+  raw.split(/[\s,]+/).filter(Boolean).forEach(s => {
+    s = s.replace(/[^A-Z0-9.\-^]/g,'');
+    if(s && !_prDraft.tickers.includes(s)) _prDraft.tickers.push(s);
+  });
+  document.getElementById('profileTickerInput').value = '';
+  _renderProfileTags();
+}
+function _removePrTicker(sym) {
+  _prDraft.tickers = _prDraft.tickers.filter(s => s !== sym);
+  _renderProfileTags();
+}
+function saveAndApplyProfile() {
+  if(!_prDraft.name) { alert('Please create or select a profile first.'); return; }
+  const profiles = loadProfiles();
+  profiles[_prDraft.name] = { tickers: [..._prDraft.tickers] };
+  saveProfiles(profiles);
+  setActiveProfileName(_prDraft.name);
+  // Load the profile's tickers into the watchlist
+  watchlistTickers = [..._prDraft.tickers];
+  saveWatchlist();
+  closeProfileModal();
+  _updateProfileBtn();
+  refreshWatchlist();
+  rerenderPicksCols();
+}
+function deleteActiveProfile() {
+  if(!_prDraft.name) return;
+  if(!confirm(`Delete profile "${_prDraft.name}"?`)) return;
+  const profiles = loadProfiles();
+  delete profiles[_prDraft.name];
+  saveProfiles(profiles);
+  const remaining = Object.keys(profiles);
+  const next = remaining[0] || null;
+  if(next) setActiveProfileName(next);
+  else localStorage.removeItem(ACTIVE_PR_KEY);
+  _prDraft = next ? { name: next, tickers: [...(profiles[next]?.tickers||[])] } : { name:'', tickers:[] };
+  _renderProfileModal();
+  _updateProfileBtn();
+}
+function _updateProfileBtn() {
+  const name = getActiveProfileName();
+  const btn = document.getElementById('profileBtn');
+  if(btn) btn.textContent = name ? `\u{1F464} ${name}` : '\u{1F464} Profile';
+}
+// Enter key shortcuts in modal inputs
+document.addEventListener('keydown', e => {
+  if(e.key==='Enter' && document.activeElement?.id==='profileTickerInput') addProfileTicker();
+  if(e.key==='Enter' && document.activeElement?.id==='newProfileName') createProfile();
+});
 
 // ═══════════════════════════════════════
 //  WATCHLIST
