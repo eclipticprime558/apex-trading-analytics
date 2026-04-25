@@ -246,6 +246,7 @@ body{
 .toggle-btn[data-ind="rsi"].on .dot{background:#3fb950;}
 .toggle-btn[data-ind="macd"].on .dot{background:#f85149;}
 .toggle-btn[data-ind="pred"].on .dot{background:rgba(88,166,255,.7);}
+.toggle-btn[data-ind="fib"].on .dot{background:#fb8f44;}
 
 /* ── Toolbar presets + grouping ── */
 .preset-btn{
@@ -1245,6 +1246,7 @@ body{
         <button class="toggle-btn" data-ind="ema9" onclick="toggleInd('ema9',this)" title="EMA9 — 9-period Exponential Moving Average. Reacts faster than MA to recent price. Great for short-term entries."><span class="dot"></span>EMA9</button>
         <button class="toggle-btn" data-ind="bb" onclick="toggleInd('bb',this)" title="Bollinger Bands — Upper/lower bands = 2 standard deviations from the 20-day MA. Near upper = overbought. Near lower = oversold. Squeeze = breakout incoming."><span class="dot"></span>BB</button>
         <button class="toggle-btn" data-ind="vwap" onclick="toggleInd('vwap',this)" title="VWAP — Volume Weighted Average Price. The price institutions use as benchmark. Price above VWAP = bullish bias. Used heavily by day traders."><span class="dot"></span>VWAP</button>
+        <button class="toggle-btn" data-ind="fib" onclick="toggleInd('fib',this)" title="Fibonacci Retracement &amp; Extensions — Auto-detects the swing high and low in the visible range. Draws retracement levels (23.6%, 38.2%, 50%, 61.8% golden ratio, 78.6%) where pullbacks typically reverse, plus extension targets (127.2%, 161.8%) for profit targets. Golden zone (50–61.8%) is highlighted."><span class="dot"></span>Fibonacci</button>
         <div class="tb-sep"></div>
         <!-- Oscillators -->
         <span class="tb-group-lbl">Oscillators</span>
@@ -1426,6 +1428,7 @@ body{
       <div class="help-item"><span class="help-icon">⏱️</span><div class="help-text">Change the <b>time range</b> (1D to 2Y) and <b>interval</b> (5min to Weekly) using the dropdowns in the header.</div></div>
       <div class="help-item"><span class="help-icon">🔀</span><div class="help-text"><b>Hover any indicator button</b> (MA20, EMA9, Bollinger, VWAP, RSI, MACD, etc.) to see a plain-English explanation of what it measures before you turn it on.</div></div>
       <div class="help-item"><span class="help-icon">🔮</span><div class="help-text"><b>Forecast zone</b> — 3 projected candles based on ATR volatility, RSI momentum, and MACD direction. A probability range, not a guarantee.</div></div>
+      <div class="help-item"><span class="help-icon">&#9638;</span><div class="help-text"><b>Fibonacci</b> — Auto-detects the largest swing high and low in the visible range and draws retracement levels (23.6%, 38.2%, 50%, <b>61.8% golden ratio</b>, 78.6%) plus extension targets (127.2%, <b>161.8%</b>, 200%). The <b>golden zone (50–61.8%)</b> is highlighted — this is where price most often stalls and reverses. Orange dot = swing high, green dot = swing low. Zoom in/out to change the reference swing.</div></div>
       <div class="help-item"><span class="help-icon">🔙</span><div class="help-text">The browser <b>Back button</b> returns you to Market Picks. The URL updates automatically (e.g. <code>#chart/AAPL</code>) so you can bookmark or share any chart.</div></div>
     </div>
 
@@ -1474,7 +1477,8 @@ let indicators  = {};
 // Default: clean view — just MA50 + Volume. User can add more via toolbar.
 let ind = {
   ma20:false, ma50:true, ma200:false, ema9:false,
-  bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false
+  bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false,
+  fib:false
 };
 // Chart view state
 let viewStart = 0;   // index of first visible candle
@@ -2520,6 +2524,93 @@ function drawChart() {
     ctx.strokeStyle='rgba(88,166,255,0.6)';ctx.lineWidth=1.5;ctx.setLineDash([2,3]);
     ctx.beginPath();ctx.moveTo(fxStart-step/2,pY(pred.predMid));ctx.lineTo(fxEnd+step,pY(pred.predMid));ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  // ── Fibonacci Retracement + Extensions ──
+  if(ind.fib && visData.length >= 10) {
+    // Auto-detect swing high and low from visible range
+    let hiIdx = 0, loIdx = 0;
+    visData.forEach((d, i) => {
+      if(d.high > visData[hiIdx].high) hiIdx = i;
+      if(d.low  < visData[loIdx].low)  loIdx = i;
+    });
+    const swingHi = visData[hiIdx].high;
+    const swingLo = visData[loIdx].low;
+    const fibRange = swingHi - swingLo;
+
+    if(fibRange > 0) {
+      // If low came before high → uptrend, retracement pulls back from high toward low
+      // If high came before low → downtrend, retracement bounces from low toward high
+      const uptrend = loIdx < hiIdx;
+
+      // Retracement levels (0% = start of move, 100% = end of move)
+      const retLevels = [
+        { pct:0,     label:'0%',     color:'rgba(139,148,158,0.75)', lw:1   },
+        { pct:0.236, label:'23.6%',  color:'rgba(57,197,207,0.8)',   lw:1   },
+        { pct:0.382, label:'38.2%',  color:'rgba(88,166,255,0.85)',  lw:1   },
+        { pct:0.5,   label:'50%',    color:'rgba(210,153,34,0.85)',  lw:1   },
+        { pct:0.618, label:'61.8%',  color:'rgba(251,143,68,1.0)',   lw:1.5 }, // golden ratio
+        { pct:0.786, label:'78.6%',  color:'rgba(163,113,247,0.8)',  lw:1   },
+        { pct:1,     label:'100%',   color:'rgba(139,148,158,0.75)', lw:1   },
+      ];
+      // Extension levels (targets beyond the original move)
+      const extLevels = [
+        { pct:1.272, label:'127.2%', color:'rgba(57,197,207,0.65)',  lw:1   },
+        { pct:1.618, label:'161.8%', color:'rgba(251,143,68,0.85)',  lw:1.5 }, // golden extension
+        { pct:2.0,   label:'200%',   color:'rgba(139,148,158,0.6)',  lw:1   },
+      ];
+
+      // Subtle fill for the "golden zone" (50%–61.8%) — most reliable bounce area
+      const gTop   = uptrend ? swingHi - 0.5   * fibRange : swingLo + 0.5   * fibRange;
+      const gBtm   = uptrend ? swingHi - 0.618 * fibRange : swingLo + 0.618 * fibRange;
+      const gY1 = Math.min(pY(gTop), pY(gBtm));
+      const gY2 = Math.max(pY(gTop), pY(gBtm));
+      if(gY2 > pp.y && gY1 < pp.y+pp.h) {
+        ctx.fillStyle='rgba(251,143,68,0.08)';
+        ctx.fillRect(PAD_L, Math.max(gY1,pp.y), W-PAD_L-PAD_R, Math.min(gY2,pp.y+pp.h)-Math.max(gY1,pp.y));
+        ctx.fillStyle='rgba(251,143,68,0.35)';ctx.font='8px "JetBrains Mono"';ctx.textAlign='left';
+        ctx.fillText('GOLDEN ZONE',PAD_L+4,Math.max(gY1,pp.y)+10);
+      }
+
+      // Draw all level lines + labels
+      [...retLevels, ...extLevels].forEach(({ pct, label, color, lw }) => {
+        // In uptrend: levels count DOWN from swing high (high=0%, low=100%)
+        // In downtrend: levels count UP from swing low (low=0%, high=100%)
+        const price = uptrend
+          ? swingHi - pct * fibRange
+          : swingLo + pct * fibRange;
+        const y = pY(price);
+        if(y < pp.y-1 || y > pp.y+pp.h+1) return;
+
+        ctx.save();
+        ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.setLineDash([6,4]);
+        ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(W-PAD_R,y); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle=color;
+        ctx.font=(lw>1?'bold ':'')+' 9px "JetBrains Mono"';
+        // % label on left axis
+        ctx.textAlign='right';
+        ctx.fillText(label, PAD_L-4, y+3);
+        // Price on right axis
+        ctx.textAlign='left';
+        ctx.fillText('$'+price.toFixed(2), W-PAD_R+2, y+3);
+        ctx.restore();
+      });
+
+      // Swing point markers — dot at detected high (red) and low (green)
+      const hiX=toX(hiIdx), hiY_=pY(swingHi);
+      const loX=toX(loIdx), loY_=pY(swingLo);
+      ctx.fillStyle='rgba(248,81,73,0.9)';
+      ctx.beginPath(); ctx.arc(hiX, hiY_-7, 4, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(63,185,80,0.9)';
+      ctx.beginPath(); ctx.arc(loX, loY_+7, 4, 0, Math.PI*2); ctx.fill();
+
+      // "AUTO FIB" badge top-left of chart
+      ctx.fillStyle='rgba(251,143,68,0.65)';
+      ctx.font='bold 8px "JetBrains Mono"';ctx.textAlign='left';
+      ctx.fillText('AUTO FIB \u2022 '+(uptrend?'UPTREND':'DOWNTREND'), PAD_L+4, pp.y+14);
+    }
   }
 
   // S/R lines
