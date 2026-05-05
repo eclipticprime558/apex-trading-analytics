@@ -481,6 +481,19 @@ body{
 .conf-bar-wrap{height:4px;background:var(--bg);border-radius:2px;margin-top:6px;}
 .conf-bar{height:100%;border-radius:2px;background:var(--accent);}
 
+/* ── Forecast Chart panel ── */
+#forecastCanvas{display:block;width:100%;border-radius:0 0 8px 8px;}
+.fc-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:10px;color:var(--text3);padding:6px 14px 4px;}
+.fc-legend span{display:flex;align-items:center;gap:4px;}
+.fc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.fc-mode-btn{
+  background:none;border:1px solid var(--border);color:var(--text3);
+  font-size:11px;padding:2px 10px;border-radius:4px;cursor:pointer;
+  font-family:'Inter',sans-serif;transition:background .15s,border-color .15s,color .15s;
+}
+.fc-mode-btn.on{background:rgba(88,166,255,.12);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.fc-mode-btn:hover:not(.on){background:rgba(88,166,255,.06);border-color:rgba(88,166,255,.4);color:var(--text);}
+
 /* Tabs */
 .tab-bar{display:flex;border-bottom:1px solid var(--border);}
 .tab{
@@ -1339,6 +1352,15 @@ body{
         <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">&#8862; Zoom</button>
         <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">&#8617; Reset</button>
       </div>
+      <!-- MACD Sub-Options — shown when MACD is ON -->
+      <div id="macdSubBar" style="display:none;padding:5px 14px 6px;border-bottom:1px solid var(--border);background:rgba(248,81,73,.04);align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:9px;color:var(--red);letter-spacing:.8px;text-transform:uppercase;font-weight:600;">MACD Mode:</span>
+        <button class="toggle-btn on" id="macdStdBtn"   onclick="setMacdMode('std',this)"   title="Standard MACD — Classic settings used by most traders and algorithms. Reliable swing signals.">Standard (12/26/9)</button>
+        <button class="toggle-btn"    id="macdFastBtn"  onclick="setMacdMode('fast',this)"  title="Fast MACD — Reacts quicker to price changes. More signals, slightly more noise. Good for active trading.">Fast (8/17/9)</button>
+        <button class="toggle-btn"    id="macdUFastBtn" onclick="setMacdMode('ufast',this)" title="Ultra Fast MACD — Extremely reactive. Best for short-term momentum. Many crossovers — use with RSI to filter.">Ultra Fast (5/13/5)</button>
+        <button class="toggle-btn"    id="macdSlowBtn"  onclick="setMacdMode('slow',this)"  title="Slow MACD — Fewer signals but higher quality. Ideal for swing trading and filtering out daily noise.">Slow (19/39/9)</button>
+        <span id="macdParamLabel" style="font-size:9px;color:var(--text3);margin-left:4px;"></span>
+      </div>
       <!-- Fibonacci Sub-Options — shown when Fibonacci is ON -->
       <div id="fibSubBar" style="display:none;padding:5px 14px 6px;border-bottom:1px solid var(--border);background:rgba(251,143,68,.04);display:none;align-items:center;gap:6px;flex-wrap:wrap;">
         <span style="font-size:9px;color:var(--orange);letter-spacing:.8px;text-transform:uppercase;font-weight:600;">Fib Tools:</span>
@@ -1354,6 +1376,30 @@ body{
         <div class="chart-tooltip" id="chartTip"></div>
         <div id="selBox" style="position:absolute;display:none;pointer-events:none;border:2px solid var(--accent);background:rgba(88,166,255,.08);box-shadow:inset 0 0 0 1px rgba(88,166,255,.3);"></div>
       </div>
+    </div>
+
+    <!-- Price Forecast Chart -->
+    <div class="panel" id="forecastPanel" style="display:none;padding-bottom:0;">
+      <div class="panel-hdr">
+        <div class="panel-title">📈 Price Forecast</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="fc-mode-btn on" id="fcWeekBtn" onclick="setFcMode('week',this)">1 Week</button>
+          <button class="fc-mode-btn" id="fcMonthBtn" onclick="setFcMode('month',this)">1 Month</button>
+          <button class="expand-btn" onclick="expandPanel('forecastPanel')" title="Expand forecast">⛶ Expand</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+        <div class="fc-legend">
+          <span><span class="fc-dot" style="background:#58a6ff"></span>Base Case</span>
+          <span><span class="fc-dot" style="background:#3fb950"></span>Bull</span>
+          <span><span class="fc-dot" style="background:#f85149"></span>Bear</span>
+          <span><span class="fc-dot" style="background:rgba(88,166,255,.25);border-radius:2px;width:16px;height:9px;"></span>Confidence Range</span>
+        </div>
+        <div id="fcSummary" style="font-size:10px;color:var(--text3);padding:0 14px 6px;text-align:right;"></div>
+      </div>
+      <canvas id="forecastCanvas"></canvas>
+      <!-- Range & Volatility stats strip -->
+      <div id="fcRangeStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);"></div>
     </div>
 
     <!-- Stock News — under chart -->
@@ -2047,16 +2093,42 @@ function calcRSI(closes, p=14) {
   }
   return r;
 }
-function calcMACD(closes) {
-  const e12=calcEMA(closes,12),e26=calcEMA(closes,26);
-  const macd=closes.map((_,i)=>e12[i]!=null&&e26[i]!=null?e12[i]-e26[i]:null);
+let _macdParams = {fast:12, slow:26, sig:9, label:'Standard'};
+
+const _macdPresets = {
+  std:   {fast:12, slow:26, sig:9,  label:'Standard (12/26/9)'},
+  fast:  {fast:8,  slow:17, sig:9,  label:'Fast (8/17/9)'},
+  ufast: {fast:5,  slow:13, sig:5,  label:'Ultra Fast (5/13/5)'},
+  slow:  {fast:19, slow:39, sig:9,  label:'Slow (19/39/9)'},
+};
+
+function setMacdMode(mode, btn) {
+  _macdParams = {..._macdPresets[mode]};
+  document.querySelectorAll('#macdSubBar .toggle-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const lbl = document.getElementById('macdParamLabel');
+  if(lbl) lbl.textContent = '— ' + _macdParams.label;
+  if(!rawData.length) return;
+  calcIndicators();
+  drawChart();
+  updateSignalCard();
+  updatePrediction();
+  updateTradeSetup();
+}
+
+function calcMACD(closes, fast, slow, sigLen) {
+  fast   = fast   || _macdParams.fast;
+  slow   = slow   || _macdParams.slow;
+  sigLen = sigLen || _macdParams.sig;
+  const ef=calcEMA(closes,fast), es=calcEMA(closes,slow);
+  const macd=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);
   const valid=macd.filter(x=>x!=null);
   const sig=new Array(closes.length).fill(null);
   const fi=macd.findIndex(x=>x!=null);
-  if(fi>=0&&valid.length>=9){
-    let s=avg(valid.slice(0,9));sig[fi+8]=s;
-    const k=2/10;
-    for(let i=fi+9;i<closes.length;i++){s=(macd[i]-s)*k+s;sig[i]=s;}
+  if(fi>=0&&valid.length>=sigLen){
+    let s=avg(valid.slice(0,sigLen));sig[fi+sigLen-1]=s;
+    const k=2/(sigLen+1);
+    for(let i=fi+sigLen;i<closes.length;i++){s=(macd[i]-s)*k+s;sig[i]=s;}
   }
   const hist=macd.map((v,i)=>v!=null&&sig[i]!=null?v-sig[i]:null);
   return {macd,signal:sig,hist};
@@ -2502,6 +2574,11 @@ function updateTradeSetup() {
 // ═══════════════════════════════════════
 function updatePrediction() {
   const {pred} = indicators;
+  // Show and draw the visual forecast panel
+  const fp = document.getElementById('forecastPanel');
+  if(fp) fp.style.display = '';
+  drawForecastChart();
+  updateRangeStats();
   const biasStr = pred.bias>0.2?'BULLISH':pred.bias<-0.2?'BEARISH':'NEUTRAL';
   const biasColor = pred.bias>0.2?'var(--green)':pred.bias<-0.2?'var(--red)':'var(--yellow)';
   document.getElementById('predGrid').innerHTML=`
@@ -2527,6 +2604,253 @@ function updatePrediction() {
       <div class="conf-bar-wrap"><div class="conf-bar" style="width:${pred.confPct}%"></div></div>
       <div class="pi-sub">Confidence: ${pred.confPct}% &nbsp;|&nbsp; ATR-based range, not financial advice</div>
     </div>`;
+}
+
+// ═══════════════════════════════════════
+//  FORECAST CHART
+// ═══════════════════════════════════════
+let _fcMode = 'week';
+
+function setFcMode(mode, btn) {
+  _fcMode = mode;
+  document.querySelectorAll('.fc-mode-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  drawForecastChart();
+}
+
+function drawForecastChart() {
+  const panel  = document.getElementById('forecastPanel');
+  const canvas = document.getElementById('forecastCanvas');
+  if(!panel || !canvas || !indicators || !indicators.pred) return;
+
+  const days     = _fcMode === 'week' ? 5 : 20;
+  const histBars = _fcMode === 'week' ? 30 : 60;
+
+  const { closes, returns } = indicators;
+  const { bias, lastATR, confPct } = indicators.pred;
+
+  const histPrices  = closes.slice(-histBars);
+  const lastPrice   = closes[closes.length - 1];
+
+  // Mean + sigma from recent returns
+  const recentR = returns.slice(-40).filter(r => r != null && isFinite(r));
+  const mu      = recentR.length ? avg(recentR) : 0;
+  const sigma   = recentR.length > 1 ? stdDev(recentR) : Math.abs(mu) || 0.01;
+
+  // Directional bias nudge (keep small to avoid unrealistic drift)
+  const adjMu = mu + bias * sigma * 0.25;
+
+  // Build scenario paths (geometric / log-normal style)
+  const basePath = [lastPrice];
+  const bullPath = [lastPrice];
+  const bearPath = [lastPrice];
+  const outerBull= [lastPrice];
+  const outerBear= [lastPrice];
+  for(let i = 1; i <= days; i++) {
+    basePath.push(lastPrice * Math.exp(adjMu * i));
+    bullPath.push(lastPrice * Math.exp((adjMu + sigma)   * i));
+    bearPath.push(lastPrice * Math.exp((adjMu - sigma)   * i));
+    outerBull.push(lastPrice * Math.exp((adjMu + 1.8*sigma) * i));
+    outerBear.push(lastPrice * Math.exp((adjMu - 1.8*sigma) * i));
+  }
+
+  // Canvas sizing
+  const dpr = window.devicePixelRatio || 1;
+  const W   = panel.clientWidth || 700;
+  const H   = 240;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const padL = 62, padR = 56, padT = 18, padB = 36;
+  const cW = W - padL - padR;
+  const cH = H - padT - padB;
+  const totalBars = histBars + days;
+  const barW = cW / totalBars;
+
+  const xOf = i => padL + (i + 0.5) * barW;
+  const allP = [...histPrices, ...outerBull.slice(1), ...outerBear.slice(1)];
+  const minP = Math.min(...allP) * 0.997;
+  const maxP = Math.max(...allP) * 1.003;
+  const rng  = maxP - minP || 1;
+  const yOf  = p => padT + (1 - (p - minP) / rng) * cH;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines + Y labels
+  const steps = 5;
+  for(let i = 0; i <= steps; i++) {
+    const p = minP + (rng / steps) * i;
+    const y = yOf(p);
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(139,148,158,.65)';
+    ctx.font = '10px Inter,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('$' + p.toFixed(2), padL - 5, y + 3.5);
+  }
+
+  // "Today" divider
+  const todayX = xOf(histBars - 1);
+  ctx.strokeStyle = 'rgba(139,148,158,.35)';
+  ctx.setLineDash([5, 4]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(todayX, padT - 6); ctx.lineTo(todayX, H - padB); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(139,148,158,.6)';
+  ctx.font = 'bold 9px Inter,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('NOW', todayX, padT - 8);
+
+  // Outer confidence band fill
+  ctx.beginPath();
+  for(let i = 0; i <= days; i++) {
+    const x = xOf(histBars - 1 + i), y = yOf(outerBull[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  for(let i = days; i >= 0; i--) ctx.lineTo(xOf(histBars - 1 + i), yOf(outerBear[i]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(88,166,255,0.055)';
+  ctx.fill();
+
+  // Inner band fill (±1σ)
+  ctx.beginPath();
+  for(let i = 0; i <= days; i++) {
+    const x = xOf(histBars - 1 + i), y = yOf(bullPath[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  for(let i = days; i >= 0; i--) ctx.lineTo(xOf(histBars - 1 + i), yOf(bearPath[i]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(88,166,255,0.11)';
+  ctx.fill();
+
+  // Helper: draw line
+  const drawLine = (path, color, width, dash=[]) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash);
+    for(let i = 0; i < path.length; i++) {
+      const x = path[i][0], y = path[i][1];
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+
+  // Historical line
+  drawLine(
+    histPrices.map((p,i) => [xOf(i), yOf(p)]),
+    'rgba(139,148,158,0.55)', 1.5
+  );
+
+  // Bull / Bear dashed lines
+  drawLine(
+    bullPath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
+    'rgba(63,185,80,0.75)', 1.5, [6,4]
+  );
+  drawLine(
+    bearPath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
+    'rgba(248,81,73,0.75)', 1.5, [6,4]
+  );
+
+  // Base case — bright solid line
+  drawLine(
+    basePath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
+    'rgba(88,166,255,0.92)', 2.5
+  );
+
+  // End dots + price labels
+  const endX = xOf(histBars - 1 + days);
+  [
+    [basePath[days], '#58a6ff', 4.5],
+    [bullPath[days], '#3fb950', 3.5],
+    [bearPath[days], '#f85149', 3.5],
+  ].forEach(([p, c, r]) => {
+    ctx.beginPath();
+    ctx.arc(endX, yOf(p), r, 0, Math.PI*2);
+    ctx.fillStyle = c;
+    ctx.fill();
+  });
+  [
+    [basePath[days], '#58a6ff', 'bold 10px'],
+    [bullPath[days], '#3fb950', '10px'],
+    [bearPath[days], '#f85149', '10px'],
+  ].forEach(([p, c, f]) => {
+    ctx.fillStyle = c;
+    ctx.font = f + ' Inter,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('$' + p.toFixed(2), endX + 6, yOf(p) + 3.5);
+  });
+
+  // X-axis date labels
+  const today = new Date();
+  ctx.fillStyle = 'rgba(139,148,158,.55)';
+  ctx.font = '9px Inter,sans-serif';
+  ctx.textAlign = 'center';
+  const interval = Math.ceil(days / 4);
+  for(let i = 0; i <= days; i += interval) {
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    ctx.fillText(
+      d.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
+      xOf(histBars - 1 + i), H - padB + 14
+    );
+  }
+  // Also label "today" on x axis
+  ctx.fillText(
+    today.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
+    todayX, H - padB + 14
+  );
+
+  // Summary text
+  const direction = basePath[days] > lastPrice ? '▲' : '▼';
+  const changePct = ((basePath[days] - lastPrice) / lastPrice * 100).toFixed(1);
+  const biasLabel = bias > 0.2 ? 'BULLISH' : bias < -0.2 ? 'BEARISH' : 'NEUTRAL';
+  const biasColor = bias > 0.2 ? '#3fb950' : bias < -0.2 ? '#f85149' : '#e3b341';
+  document.getElementById('fcSummary').innerHTML =
+    `Base: <b style="color:${biasColor}">${biasLabel}</b> &nbsp;${direction} ${Math.abs(changePct)}% over ${days} days &nbsp;|&nbsp; Confidence: ${confPct}%`;
+}
+
+function updateRangeStats() {
+  const el = document.getElementById('fcRangeStats');
+  if(!el || !rawData.length) return;
+  const periods = [
+    {days:5,  label:'5-Day'},
+    {days:10, label:'10-Day'},
+    {days:15, label:'15-Day'},
+  ];
+  el.innerHTML = periods.map(({days, label}) => {
+    const slice = rawData.slice(-days);
+    if(!slice.length) return '';
+    const highs  = slice.map(d => d.high);
+    const lows   = slice.map(d => d.low);
+    const closes = slice.map(d => d.close);
+    const hi     = Math.max(...highs);
+    const lo     = Math.min(...lows);
+    const rng    = hi - lo;
+    const sd     = stdDev(closes);
+    const avgC   = avg(closes);
+    const chg    = (closes[closes.length-1] - closes[0]) / closes[0] * 100;
+    const up     = chg >= 0;
+    return `<div style="background:var(--bg3);padding:10px 14px;">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px;">${label} Range</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:11px;">
+        <div style="color:var(--text3)">High</div>
+        <div style="color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:600;">$${hi.toFixed(2)}</div>
+        <div style="color:var(--text3)">Low</div>
+        <div style="color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:600;">$${lo.toFixed(2)}</div>
+        <div style="color:var(--text3)">Range</div>
+        <div style="color:var(--text);font-family:'JetBrains Mono',monospace;">$${rng.toFixed(2)}</div>
+        <div style="color:var(--text3)">Std Dev</div>
+        <div style="color:var(--accent);font-family:'JetBrains Mono',monospace;">$${sd.toFixed(2)}</div>
+        <div style="color:var(--text3)">Avg Close</div>
+        <div style="color:var(--text2);font-family:'JetBrains Mono',monospace;">$${avgC.toFixed(2)}</div>
+        <div style="color:var(--text3)">Net Chg</div>
+        <div style="color:${up?'var(--green)':'var(--red)'};font-family:'JetBrains Mono',monospace;">${up?'+':''}${chg.toFixed(2)}%</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════
@@ -2608,6 +2932,7 @@ let _expandedId = null;
 
 const _panelTitles = {
   chartPanel:       'Chart',
+  forecastPanel:    'Price Forecast',
   chartNewsUnder:   'Latest News',
   signalCard:       'Trading Signal',
   tradeCard:        'Trade Setup',
@@ -2679,6 +3004,10 @@ function toggleInd(key, btn) {
     const sub = document.getElementById('fibSubBar');
     sub.style.display = ind[key] ? 'flex' : 'none';
     if(!ind[key]) { fibMode='auto'; fibManualSwings=[]; }
+  }
+  if(key === 'macd') {
+    const sub = document.getElementById('macdSubBar');
+    if(sub) sub.style.display = ind[key] ? 'flex' : 'none';
   }
   saveChartSettings();
   drawChart();
@@ -3507,31 +3836,91 @@ function drawChart() {
     const allVals=[...macdSlice,...sigSlice,...histSlice].filter(x=>x!=null);
     if(allVals.length){
       const mMax=Math.max(...allVals.map(Math.abs))||1;
-      const mY=(v)=>mp.y+mp.h/2-((v/mMax)*(mp.h/2-6));
+      const mY=(v)=>mp.y+mp.h/2-((v/mMax)*(mp.h/2-8));
+      const zY=mY(0);
+
+      // Panel background (subtle)
+      ctx.fillStyle='rgba(248,81,73,0.025)';
+      ctx.fillRect(PAD_L,mp.y,W-PAD_L-PAD_R,mp.h);
+
+      // ±50% reference lines (dashed)
+      [0.5,-0.5].forEach(f=>{
+        ctx.strokeStyle='rgba(139,148,158,0.12)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+        ctx.beginPath();ctx.moveTo(PAD_L,mY(mMax*f));ctx.lineTo(W-PAD_R,mY(mMax*f));ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
       // Zero line
-      ctx.strokeStyle='rgba(48,54,61,0.9)';ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(PAD_L,mY(0));ctx.lineTo(W-PAD_R,mY(0));ctx.stroke();
-      // Histogram
+      ctx.strokeStyle='rgba(139,148,158,0.35)';ctx.lineWidth=1;ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(PAD_L,zY);ctx.lineTo(W-PAD_R,zY);ctx.stroke();
+
+      // Histogram — color by direction change (growing vs shrinking)
       histSlice.forEach((v,i)=>{
         if(v==null)return;
-        const x=toX(i);const zY=mY(0);const vY=mY(v);
-        ctx.fillStyle=v>=0?'rgba(63,185,80,0.5)':'rgba(248,81,73,0.5)';
-        ctx.fillRect(x-candleW/2,Math.min(zY,vY),candleW,Math.abs(vY-zY)||1);
+        const prev=histSlice[i-1];
+        const growing = prev==null || Math.abs(v)>=Math.abs(prev);
+        const x=toX(i), vY=mY(v);
+        if(v>=0) ctx.fillStyle=growing?'rgba(63,185,80,0.7)':'rgba(63,185,80,0.35)';
+        else     ctx.fillStyle=growing?'rgba(248,81,73,0.7)':'rgba(248,81,73,0.35)';
+        ctx.fillRect(x-candleW/2,Math.min(zY,vY),Math.max(candleW,1),Math.abs(vY-zY)||1);
       });
+
       // MACD line
-      ctx.strokeStyle='#58a6ff';ctx.lineWidth=1.5;ctx.beginPath();let mf=true;
+      ctx.strokeStyle='#58a6ff';ctx.lineWidth=1.8;ctx.setLineDash([]);ctx.beginPath();let mf=true;
       macdSlice.forEach((v,i)=>{
         if(v!=null){if(mf){ctx.moveTo(toX(i),mY(v));mf=false;}else ctx.lineTo(toX(i),mY(v));}
       });
       ctx.stroke();
+
       // Signal line
-      ctx.strokeStyle='#fb8f44';ctx.lineWidth=1;ctx.beginPath();let sf=true;
+      ctx.strokeStyle='#fb8f44';ctx.lineWidth=1.2;ctx.beginPath();let sf=true;
       sigSlice.forEach((v,i)=>{
         if(v!=null){if(sf){ctx.moveTo(toX(i),mY(v));sf=false;}else ctx.lineTo(toX(i),mY(v));}
       });
       ctx.stroke();
-      ctx.fillStyle='rgba(139,148,158,0.6)';ctx.font='9px "JetBrains Mono"';ctx.textAlign='right';
-      ctx.fillText('MACD',PAD_L-5,mp.y+12);
+
+      // Crossover dots — where MACD crosses signal
+      for(let i=1;i<macdSlice.length;i++){
+        const m0=macdSlice[i-1],m1=macdSlice[i],s0=sigSlice[i-1],s1=sigSlice[i];
+        if(m0==null||m1==null||s0==null||s1==null)continue;
+        const wasBull=m0>s0, isBull=m1>s1;
+        if(wasBull!==isBull){
+          const x=toX(i), y=mY(m1);
+          ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);
+          ctx.fillStyle=isBull?'#3fb950':'#f85149';ctx.fill();
+          ctx.strokeStyle='var(--bg)';ctx.lineWidth=1;ctx.stroke();
+          // Small "B"/"S" label above dot
+          ctx.fillStyle=isBull?'#3fb950':'#f85149';
+          ctx.font='bold 8px Inter,sans-serif';ctx.textAlign='center';
+          ctx.fillText(isBull?'B':'S',x,y-(isBull?7:-2));
+        }
+      }
+
+      // Current value labels (right side)
+      const lastM=macdSlice.filter(x=>x!=null).pop();
+      const lastS=sigSlice.filter(x=>x!=null).pop();
+      const lastH=histSlice.filter(x=>x!=null).pop();
+      if(lastM!=null&&lastS!=null){
+        ctx.font='9px "JetBrains Mono"';ctx.textAlign='left';
+        const lx=W-PAD_R+4;
+        ctx.fillStyle='#58a6ff';
+        ctx.fillText(lastM.toFixed(3),lx,mY(lastM)+3.5);
+        ctx.fillStyle='#fb8f44';
+        ctx.fillText(lastS.toFixed(3),lx,mY(lastS)+3.5);
+        if(lastH!=null){
+          ctx.fillStyle=lastH>=0?'#3fb950':'#f85149';
+          ctx.fillText((lastH>=0?'+':'')+lastH.toFixed(3),lx,zY+3.5);
+        }
+      }
+
+      // Panel label with mode info
+      ctx.fillStyle='rgba(139,148,158,0.7)';ctx.font='bold 9px "JetBrains Mono"';ctx.textAlign='right';
+      ctx.fillText('MACD '+_macdParams.label,PAD_L-5,mp.y+11);
+      // Legend
+      ctx.font='9px Inter,sans-serif';ctx.textAlign='left';
+      ctx.fillStyle='#58a6ff'; ctx.fillText('─ MACD',PAD_L+4,mp.y+11);
+      ctx.fillStyle='#fb8f44'; ctx.fillText('─ Signal',PAD_L+60,mp.y+11);
+      ctx.fillStyle='rgba(139,148,158,.6)'; ctx.fillText('■ Hist',PAD_L+120,mp.y+11);
     }
   }
 
