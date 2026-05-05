@@ -1275,11 +1275,30 @@ body{
         <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">&#8862; Zoom</button>
         <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">&#8617; Reset</button>
       </div>
+      <!-- Fibonacci Sub-Options — shown when Fibonacci is ON -->
+      <div id="fibSubBar" style="display:none;padding:5px 14px 6px;border-bottom:1px solid var(--border);background:rgba(251,143,68,.04);display:none;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:9px;color:var(--orange);letter-spacing:.8px;text-transform:uppercase;font-weight:600;">Fib Tools:</span>
+        <button id="fibModeBtn" class="toggle-btn" onclick="toggleFibMode()" title="Switch between auto swing detection and manual click-to-set swing points">Auto Detect</button>
+        <button id="fibFansBtn" class="toggle-btn" onclick="toggleFibOpt('fans')" title="Fan Lines — diagonal lines radiating from the swing origin through each Fib level, acting as dynamic diagonal support/resistance as price moves forward">Fans</button>
+        <button id="fibTZBtn" class="toggle-btn" onclick="toggleFibOpt('tz')" title="Time Zones — vertical lines at Fibonacci-number intervals (1,2,3,5,8,13,21...) from the swing point, marking bars where reversals historically tend to occur">Time Zones</button>
+        <button id="fibConfBtn" class="toggle-btn on" onclick="toggleFibOpt('conf')" title="Confluence — highlights any Fib level that aligns within 1% of a moving average or support/resistance line. These double-confirmed zones are the highest probability reversal areas">Confluence</button>
+        <button id="fibResetBtn" onclick="resetFibManual()" style="display:none;font-size:10px;color:var(--orange);background:rgba(251,143,68,.12);border:1px solid rgba(251,143,68,.3);padding:3px 8px;border-radius:4px;cursor:pointer;font-family:'Inter',sans-serif;">↺ Reset to Auto</button>
+      </div>
+
       <div class="chart-outer" id="chartOuter">
         <canvas id="mainCanvas"></canvas>
         <div class="chart-tooltip" id="chartTip"></div>
         <div id="selBox" style="position:absolute;display:none;pointer-events:none;border:2px solid var(--accent);background:rgba(88,166,255,.08);box-shadow:inset 0 0 0 1px rgba(88,166,255,.3);"></div>
       </div>
+    </div>
+
+    <!-- Stock News — under chart -->
+    <div class="panel" id="chartNewsUnder" style="display:none">
+      <div class="panel-hdr">
+        <div class="panel-title" id="chartNewsTicker">📰 Latest News</div>
+        <div style="font-size:10px;color:var(--text3)">Why is this stock moving? Click any headline to read full article.</div>
+      </div>
+      <div id="chartNewsUnderGrid" style="display:grid;grid-template-columns:1fr 1fr;"></div>
     </div>
   </div>
 
@@ -1292,6 +1311,19 @@ body{
       <div class="signal-main" id="sigMain">—</div>
       <div class="signal-score" id="sigScore">Load data to analyze</div>
       <div class="signal-bar-wrap"><div class="signal-bar" id="sigBar" style="width:50%;background:var(--text3)"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin:-2px 0 6px;letter-spacing:.3px;">
+        <span style="color:var(--red)">0 — Strong Sell</span>
+        <span style="color:var(--yellow)">50 — Hold</span>
+        <span style="color:var(--green)">100 — Strong Buy</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);background:var(--bg3);border-radius:4px;padding:6px 8px;margin-bottom:6px;line-height:1.6;text-align:left;">
+        Score = <b style="color:var(--text2)">50 baseline</b> ± points added or subtracted by RSI, MACD, moving averages, momentum, volume &amp; Bollinger Bands.
+        <span style="color:var(--green)">72+</span> = Strong Buy &nbsp;·&nbsp;
+        <span style="color:var(--green)">58–71</span> = Buy &nbsp;·&nbsp;
+        <span style="color:var(--yellow)">42–57</span> = Hold &nbsp;·&nbsp;
+        <span style="color:var(--red)">28–41</span> = Sell &nbsp;·&nbsp;
+        <span style="color:var(--red)">&lt;28</span> = Strong Sell
+      </div>
       <div class="signal-factors" id="sigFactors"></div>
     </div>
 
@@ -1366,6 +1398,17 @@ body{
             <tbody id="tblBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Company News -->
+    <div class="panel" id="companyNewsPanel" style="display:none">
+      <div class="panel-hdr">
+        <div class="panel-title" id="companyNewsTitle">Company News</div>
+        <div style="font-size:10px;color:var(--text3)">Why this signal?</div>
+      </div>
+      <div id="companyNewsContainer">
+        <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Load data to see news</div>
       </div>
     </div>
 
@@ -1497,6 +1540,13 @@ let ind = {
 let viewStart = 0;   // index of first visible candle
 let viewCount = 80;  // how many candles to show
 let isDragging = false;
+
+// Fibonacci suite state
+let fibMode = 'auto'; // 'auto' | 'manual'
+let fibManualSwings = []; // [{absIdx, high, low, close}] — up to 2 points
+let fibShowFans = false;
+let fibShowTimeZones = false;
+let fibShowConfluence = true;
 let dragStartX = 0, dragStartView = 0;
 let hoverIdx = -1;
 let chartMode = 'candles'; // 'candles' | 'line' | 'area'
@@ -1851,6 +1901,7 @@ async function loadData() {
     document.getElementById('chartSubtitle').textContent = companyName + (source==='Yahoo Finance'?' (Yahoo Finance)':'');
     updateChartTrackBtn();
     startRefreshTimer();
+    loadCompanyNews(ticker);
     // Update URL so back button knows which stock we're on
     if(!_navSuppressPush) history.replaceState({view:'chart',ticker}, '', `#chart/${ticker}`);
 
@@ -2072,41 +2123,63 @@ function updateSignalCard() {
   let score=50;
   const factors=[];
 
-  // RSI
-  if(lastRSI>70){score-=18;factors.push({icon:'📉',label:'RSI Overbought',val:lastRSI.toFixed(1),cls:'bear'});}
-  else if(lastRSI<30){score+=18;factors.push({icon:'📈',label:'RSI Oversold',val:lastRSI.toFixed(1),cls:'bull'});}
-  else if(lastRSI>=55){score+=8;factors.push({icon:'◎',label:'RSI Bullish Zone',val:lastRSI.toFixed(1),cls:'bull'});}
-  else if(lastRSI<=45){score-=8;factors.push({icon:'◎',label:'RSI Bearish Zone',val:lastRSI.toFixed(1),cls:'bear'});}
-  else{factors.push({icon:'◎',label:'RSI Neutral',val:lastRSI.toFixed(1),cls:'neut'});}
+  // RSI (max ±18)
+  let rsiPts=0;
+  if(lastRSI>70){rsiPts=-18;factors.push({icon:'📉',label:'RSI',val:lastRSI.toFixed(1),pts:rsiPts,cls:'bear',desc:'Above 70 = overbought. Price ran up too fast — buyers are exhausted and a pullback is likely.'});}
+  else if(lastRSI<30){rsiPts=+18;factors.push({icon:'📈',label:'RSI',val:lastRSI.toFixed(1),pts:rsiPts,cls:'bull',desc:'Below 30 = oversold. Heavy selling has pushed price too low — a bounce is often near.'});}
+  else if(lastRSI>=55){rsiPts=+8;factors.push({icon:'◎',label:'RSI',val:lastRSI.toFixed(1),pts:rsiPts,cls:'bull',desc:'55–69 = bullish zone. Buyers are in control without being overextended.'});}
+  else if(lastRSI<=45){rsiPts=-8;factors.push({icon:'◎',label:'RSI',val:lastRSI.toFixed(1),pts:rsiPts,cls:'bear',desc:'31–45 = bearish zone. Sellers have the edge — trend is leaning down.'});}
+  else{rsiPts=0;factors.push({icon:'◎',label:'RSI',val:lastRSI.toFixed(1),pts:0,cls:'neut',desc:'46–54 = neutral. No strong momentum in either direction.'});}
+  score+=rsiPts;
 
-  // MACD crossover
+  // MACD (max ±18, ongoing ±8)
   const macdCross = lastMACD>lastSig&&prevMACD<=prevSig;
   const macdDcross= lastMACD<lastSig&&prevMACD>=prevSig;
-  if(macdCross){score+=18;factors.push({icon:'↗',label:'MACD Bullish Cross',val:'BUY',cls:'bull'});}
-  else if(macdDcross){score-=18;factors.push({icon:'↘',label:'MACD Bearish Cross',val:'SELL',cls:'bear'});}
-  else if(lastMACD>lastSig){score+=8;factors.push({icon:'▲',label:'MACD Bullish',val:'+',cls:'bull'});}
-  else{score-=8;factors.push({icon:'▼',label:'MACD Bearish',val:'−',cls:'bear'});}
+  let macdPts=0;
+  if(macdCross){macdPts=+18;factors.push({icon:'↗',label:'MACD',val:'Bullish Cross',pts:macdPts,cls:'bull',desc:'MACD just crossed ABOVE its signal line — the trend flipped up. Strong buy trigger.'});}
+  else if(macdDcross){macdPts=-18;factors.push({icon:'↘',label:'MACD',val:'Bearish Cross',pts:macdPts,cls:'bear',desc:'MACD just crossed BELOW its signal line — the trend flipped down. Classic sell trigger.'});}
+  else if(lastMACD>lastSig){macdPts=+8;factors.push({icon:'▲',label:'MACD',val:'Bullish',pts:macdPts,cls:'bull',desc:'MACD is above its signal line — upward momentum is intact, no crossover yet.'});}
+  else{macdPts=-8;factors.push({icon:'▼',label:'MACD',val:'Bearish',pts:macdPts,cls:'bear',desc:'MACD is below its signal line — selling pressure is in control, no crossover yet.'});}
+  score+=macdPts;
 
-  // MA position
-  if(lastClose>lma20){score+=8;factors.push({icon:'📊',label:'Above MA20',val:'+'+((lastClose/lma20-1)*100).toFixed(1)+'%',cls:'bull'});}
-  else{score-=8;factors.push({icon:'📊',label:'Below MA20',val:((lastClose/lma20-1)*100).toFixed(1)+'%',cls:'bear'});}
-  if(lastClose>lma50){score+=8;}else{score-=8;}
+  // MA20 (±8)
+  const ma20Pts = lastClose>lma20 ? +8 : -8;
+  if(lastClose>lma20){factors.push({icon:'📊',label:'vs MA20',val:'+'+((lastClose/lma20-1)*100).toFixed(1)+'%',pts:ma20Pts,cls:'bull',desc:'Price is ABOVE the 20-day moving average — short-term trend is up.'});}
+  else{factors.push({icon:'📊',label:'vs MA20',val:((lastClose/lma20-1)*100).toFixed(1)+'%',pts:ma20Pts,cls:'bear',desc:'Price is BELOW the 20-day moving average — short-term trend has turned down.'});}
+  score+=ma20Pts;
 
-  // Momentum
-  if(mom5>0.2){score+=10;factors.push({icon:'⚡',label:'5D Momentum',val:'+'+mom5.toFixed(2)+'%',cls:'bull'});}
-  else if(mom5<-0.2){score-=10;factors.push({icon:'⚡',label:'5D Momentum',val:mom5.toFixed(2)+'%',cls:'bear'});}
+  // MA50 (±8) — previously hidden, now visible
+  const ma50Pts = lastClose>lma50 ? +8 : -8;
+  if(lastClose>lma50){factors.push({icon:'📈',label:'vs MA50',val:'+'+((lastClose/lma50-1)*100).toFixed(1)+'%',pts:ma50Pts,cls:'bull',desc:'Price is ABOVE the 50-day moving average — medium-term trend is up. Institutions watch this line closely.'});}
+  else{factors.push({icon:'📉',label:'vs MA50',val:((lastClose/lma50-1)*100).toFixed(1)+'%',pts:ma50Pts,cls:'bear',desc:'Price is BELOW the 50-day moving average — medium-term trend is bearish. Big players often sell here.'});}
+  score+=ma50Pts;
 
-  // Volume
+  // 5-Day Momentum (±10)
+  let momPts=0;
+  if(mom5>0.2){momPts=+10;factors.push({icon:'⚡',label:'5D Momentum',val:'+'+mom5.toFixed(2)+'%',pts:momPts,cls:'bull',desc:'Stock has risen '+mom5.toFixed(2)+'% over the last 5 days — buyers are pushing it higher.'});}
+  else if(mom5<-0.2){momPts=-10;factors.push({icon:'⚡',label:'5D Momentum',val:mom5.toFixed(2)+'%',pts:momPts,cls:'bear',desc:'Stock has fallen '+Math.abs(mom5).toFixed(2)+'% over the last 5 days — selling pressure is consistent.'});}
+  else{momPts=0;factors.push({icon:'⚡',label:'5D Momentum',val:(mom5>=0?'+':'')+mom5.toFixed(2)+'%',pts:0,cls:'neut',desc:'Price is nearly flat over 5 days — no strong directional move.'});}
+  score+=momPts;
+
+  // Volume (±8, only fires on spike)
+  let volPts=0;
   if(avgVol5>avgVol20*1.3){
     const dir=mom5>0;
-    score+=dir?8:-8;
-    factors.push({icon:'📦',label:'Volume Spike',val:'+'+((avgVol5/avgVol20-1)*100).toFixed(0)+'%',cls:dir?'bull':'bear'});
+    volPts=dir?+8:-8;
+    factors.push({icon:'📦',label:'Volume',val:'+'+((avgVol5/avgVol20-1)*100).toFixed(0)+'% vs avg',pts:volPts,cls:dir?'bull':'bear',
+      desc:dir?'Volume spike on a rising price — institutions are buying in size. Confirms the move up.'
+              :'Volume spike on a falling price — heavy selling by large players. Confirms the move down.'});
+    score+=volPts;
+  } else {
+    factors.push({icon:'📦',label:'Volume',val:'Normal',pts:0,cls:'neut',desc:'Volume is within normal range — no unusual institutional activity to confirm or deny the trend.'});
   }
 
-  // Bollinger
+  // Bollinger Bands (±10, only fires at extremes)
+  let bbPts=0;
   if(lbb&&lbb.upper!=null){
-    if(lastClose>lbb.upper){score-=10;factors.push({icon:'↑',label:'Above Bollinger Upper',val:'Overbought',cls:'bear'});}
-    else if(lastClose<lbb.lower){score+=10;factors.push({icon:'↓',label:'Below Bollinger Lower',val:'Oversold',cls:'bull'});}
+    if(lastClose>lbb.upper){bbPts=-10;score+=bbPts;factors.push({icon:'↑',label:'Bollinger',val:'Above Upper',pts:bbPts,cls:'bear',desc:'Price broke above the upper Bollinger Band — statistically overbought. A mean-reversion pullback is common here.'});}
+    else if(lastClose<lbb.lower){bbPts=+10;score+=bbPts;factors.push({icon:'↓',label:'Bollinger',val:'Below Lower',pts:bbPts,cls:'bull',desc:'Price broke below the lower Bollinger Band — statistically oversold. Price tends to snap back toward the middle.'});}
+    else{factors.push({icon:'↕',label:'Bollinger',val:'Inside Bands',pts:0,cls:'neut',desc:'Price is within the normal Bollinger range — no extreme overbought or oversold reading.'});}
   }
 
   score = Math.max(0,Math.min(100,score));
@@ -2122,11 +2195,25 @@ function updateSignalCard() {
   document.getElementById('sigScore').textContent=`Signal Score: ${score}/100`;
   const bar=document.getElementById('sigBar');
   bar.style.width=score+'%';bar.style.background=barColor;
-  document.getElementById('sigFactors').innerHTML=factors.slice(0,6).map(f=>`
-    <div class="sf-row">
-      <span class="sf-icon">${f.icon}</span>
-      <span class="sf-label">${f.label}</span>
-      <span class="sf-val ${f.cls}">${f.val}</span>
+
+  // Score math breakdown
+  const mathParts = factors.filter(f=>f.pts!==0).map(f=>{
+    const c = f.pts>0?'var(--green)':'var(--red)';
+    return `<span style="color:${c}">${f.pts>0?'+':''}${f.pts} ${f.label}</span>`;
+  }).join(' · ');
+  const mathHtml = `<div style="font-size:9px;color:var(--text3);background:var(--bg3);border-radius:4px;padding:5px 8px;margin-bottom:6px;line-height:1.7;">
+    <b style="color:var(--text2)">How we got ${score}:</b> 50 base ${mathParts?'· '+mathParts:''} = <b style="color:var(--text)">${score}</b>
+  </div>`;
+
+  document.getElementById('sigFactors').innerHTML = mathHtml + factors.map(f=>`
+    <div class="sf-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
+      <div style="display:flex;align-items:center;gap:8px;width:100%">
+        <span class="sf-icon">${f.icon}</span>
+        <span class="sf-label" style="font-weight:500">${f.label}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)">${f.val}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;margin-left:auto;color:${f.pts>0?'var(--green)':f.pts<0?'var(--red)':'var(--text3)'};">${f.pts>0?'+':''}${f.pts}</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);padding-left:24px;line-height:1.4;">${f.desc}</div>
     </div>`).join('');
 }
 
@@ -2391,7 +2478,36 @@ function switchTab(id, el) {
 function toggleInd(key, btn) {
   ind[key] = !ind[key];
   btn.classList.toggle('on', ind[key]);
+  if(key === 'fib') {
+    const sub = document.getElementById('fibSubBar');
+    sub.style.display = ind[key] ? 'flex' : 'none';
+    if(!ind[key]) { fibMode='auto'; fibManualSwings=[]; }
+  }
   saveChartSettings();
+  drawChart();
+}
+
+// ── Fibonacci sub-option controls ──
+function toggleFibMode() {
+  fibMode = fibMode === 'auto' ? 'manual' : 'auto';
+  fibManualSwings = [];
+  const btn = document.getElementById('fibModeBtn');
+  btn.textContent = fibMode === 'auto' ? 'Auto Detect' : 'Manual Mode';
+  btn.classList.toggle('on', fibMode === 'manual');
+  document.getElementById('fibResetBtn').style.display = fibMode === 'manual' ? '' : 'none';
+  drawChart();
+}
+function toggleFibOpt(opt) {
+  if(opt==='fans')  { fibShowFans       = !fibShowFans;       document.getElementById('fibFansBtn').classList.toggle('on',fibShowFans); }
+  if(opt==='tz')    { fibShowTimeZones  = !fibShowTimeZones;  document.getElementById('fibTZBtn').classList.toggle('on',fibShowTimeZones); }
+  if(opt==='conf')  { fibShowConfluence = !fibShowConfluence; document.getElementById('fibConfBtn').classList.toggle('on',fibShowConfluence); }
+  drawChart();
+}
+function resetFibManual() {
+  fibMode='auto'; fibManualSwings=[];
+  const btn = document.getElementById('fibModeBtn');
+  btn.textContent='Auto Detect'; btn.classList.remove('on');
+  document.getElementById('fibResetBtn').style.display='none';
   drawChart();
 }
 
@@ -2597,90 +2713,178 @@ function drawChart() {
     ctx.setLineDash([]);
   }
 
-  // ── Fibonacci Retracement + Extensions ──
+  // ── Fibonacci Suite (Retracement · Extensions · Fans · Time Zones · Confluence) ──
   if(ind.fib && visData.length >= 10) {
-    // Auto-detect swing high and low from visible range
-    let hiIdx = 0, loIdx = 0;
-    visData.forEach((d, i) => {
-      if(d.high > visData[hiIdx].high) hiIdx = i;
-      if(d.low  < visData[loIdx].low)  loIdx = i;
-    });
-    const swingHi = visData[hiIdx].high;
-    const swingLo = visData[loIdx].low;
-    const fibRange = swingHi - swingLo;
+    let swingHiIdx, swingLoIdx, swingHi, swingLo;
 
-    if(fibRange > 0) {
-      // If low came before high → uptrend, retracement pulls back from high toward low
-      // If high came before low → downtrend, retracement bounces from low toward high
-      const uptrend = loIdx < hiIdx;
-
-      // Retracement levels (0% = start of move, 100% = end of move)
-      const retLevels = [
-        { pct:0,     label:'0%',     color:'rgba(139,148,158,0.75)', lw:1   },
-        { pct:0.236, label:'23.6%',  color:'rgba(57,197,207,0.8)',   lw:1   },
-        { pct:0.382, label:'38.2%',  color:'rgba(88,166,255,0.85)',  lw:1   },
-        { pct:0.5,   label:'50%',    color:'rgba(210,153,34,0.85)',  lw:1   },
-        { pct:0.618, label:'61.8%',  color:'rgba(251,143,68,1.0)',   lw:1.5 }, // golden ratio
-        { pct:0.786, label:'78.6%',  color:'rgba(163,113,247,0.8)',  lw:1   },
-        { pct:1,     label:'100%',   color:'rgba(139,148,158,0.75)', lw:1   },
-      ];
-      // Extension levels (targets beyond the original move)
-      const extLevels = [
-        { pct:1.272, label:'127.2%', color:'rgba(57,197,207,0.65)',  lw:1   },
-        { pct:1.618, label:'161.8%', color:'rgba(251,143,68,0.85)',  lw:1.5 }, // golden extension
-        { pct:2.0,   label:'200%',   color:'rgba(139,148,158,0.6)',  lw:1   },
-      ];
-
-      // Subtle fill for the "golden zone" (50%–61.8%) — most reliable bounce area
-      const gTop   = uptrend ? swingHi - 0.5   * fibRange : swingLo + 0.5   * fibRange;
-      const gBtm   = uptrend ? swingHi - 0.618 * fibRange : swingLo + 0.618 * fibRange;
-      const gY1 = Math.min(pY(gTop), pY(gBtm));
-      const gY2 = Math.max(pY(gTop), pY(gBtm));
-      if(gY2 > pp.y && gY1 < pp.y+pp.h) {
-        ctx.fillStyle='rgba(251,143,68,0.08)';
-        ctx.fillRect(PAD_L, Math.max(gY1,pp.y), W-PAD_L-PAD_R, Math.min(gY2,pp.y+pp.h)-Math.max(gY1,pp.y));
-        ctx.fillStyle='rgba(251,143,68,0.35)';ctx.font='8px "JetBrains Mono"';ctx.textAlign='left';
-        ctx.fillText('GOLDEN ZONE',PAD_L+4,Math.max(gY1,pp.y)+10);
+    if(fibMode === 'manual' && fibManualSwings.length < 2) {
+      // Show instruction overlay and first point if set
+      ctx.save();
+      ctx.fillStyle='rgba(251,143,68,0.85)';
+      ctx.font='bold 11px "JetBrains Mono"';ctx.textAlign='center';
+      const msg = fibManualSwings.length===0
+        ? '⬡ MANUAL FIB — Click on swing LOW point'
+        : '⬡ MANUAL FIB — Now click on swing HIGH point';
+      ctx.fillText(msg, PAD_L+chartW/2, pp.y+22);
+      if(fibManualSwings.length===1) {
+        const pt=fibManualSwings[0], pv=pt.absIdx-viewStart;
+        if(pv>=0&&pv<viewCount){
+          const px=toX(pv);
+          ctx.strokeStyle='rgba(251,143,68,0.7)';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+          ctx.beginPath();ctx.moveTo(px,pp.y);ctx.lineTo(px,pp.y+pp.h);ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle='rgba(251,143,68,1)';
+          ctx.beginPath();ctx.arc(px,pY(pt.close),5,0,Math.PI*2);ctx.fill();
+        }
+      }
+      ctx.restore();
+    } else {
+      // Resolve swing points
+      if(fibMode==='manual' && fibManualSwings.length===2) {
+        const A=fibManualSwings[0], B=fibManualSwings[1];
+        if(A.high >= B.high) {
+          swingHiIdx=A.absIdx-viewStart; swingHi=A.high;
+          swingLoIdx=B.absIdx-viewStart; swingLo=B.low;
+        } else {
+          swingHiIdx=B.absIdx-viewStart; swingHi=B.high;
+          swingLoIdx=A.absIdx-viewStart; swingLo=A.low;
+        }
+      } else {
+        // Auto-detect
+        let hiI=0,loI=0;
+        visData.forEach((d,i)=>{ if(d.high>visData[hiI].high) hiI=i; if(d.low<visData[loI].low) loI=i; });
+        swingHiIdx=hiI; swingHi=visData[hiI].high;
+        swingLoIdx=loI; swingLo=visData[loI].low;
       }
 
-      // Draw all level lines + labels
-      [...retLevels, ...extLevels].forEach(({ pct, label, color, lw }) => {
-        // In uptrend: levels count DOWN from swing high (high=0%, low=100%)
-        // In downtrend: levels count UP from swing low (low=0%, high=100%)
-        const price = uptrend
-          ? swingHi - pct * fibRange
-          : swingLo + pct * fibRange;
-        const y = pY(price);
-        if(y < pp.y-1 || y > pp.y+pp.h+1) return;
+      const fibRange=swingHi-swingLo;
+      if(fibRange>0) {
+        const uptrend = swingLoIdx < swingHiIdx;
+        const getPrice = pct => uptrend ? swingHi - pct*fibRange : swingLo + pct*fibRange;
 
-        ctx.save();
-        ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.setLineDash([6,4]);
-        ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(W-PAD_R,y); ctx.stroke();
-        ctx.setLineDash([]);
+        const allLevels = [
+          { pct:0,     label:'0%',     color:'rgba(139,148,158,0.7)', lw:1   },
+          { pct:0.236, label:'23.6%',  color:'rgba(57,197,207,0.8)',  lw:1   },
+          { pct:0.382, label:'38.2%',  color:'rgba(88,166,255,0.85)', lw:1   },
+          { pct:0.5,   label:'50%',    color:'rgba(210,153,34,0.85)', lw:1   },
+          { pct:0.618, label:'61.8%',  color:'rgba(251,143,68,1.0)',  lw:1.5 },
+          { pct:0.786, label:'78.6%',  color:'rgba(163,113,247,0.8)', lw:1   },
+          { pct:1,     label:'100%',   color:'rgba(139,148,158,0.7)', lw:1   },
+          { pct:1.272, label:'127.2%', color:'rgba(57,197,207,0.6)',  lw:1   },
+          { pct:1.618, label:'161.8%', color:'rgba(251,143,68,0.85)', lw:1.5 },
+          { pct:2.0,   label:'200%',   color:'rgba(139,148,158,0.55)',lw:1   },
+          { pct:2.618, label:'261.8%', color:'rgba(251,143,68,0.5)',  lw:1   },
+        ];
 
-        ctx.fillStyle=color;
-        ctx.font=(lw>1?'bold ':'')+' 9px "JetBrains Mono"';
-        // % label on left axis
-        ctx.textAlign='right';
-        ctx.fillText(label, PAD_L-4, y+3);
-        // Price on right axis
-        ctx.textAlign='left';
-        ctx.fillText('$'+price.toFixed(2), W-PAD_R+2, y+3);
-        ctx.restore();
-      });
+        // Golden zone fill (50–61.8%)
+        const gY1=Math.min(pY(getPrice(0.5)),pY(getPrice(0.618)));
+        const gY2=Math.max(pY(getPrice(0.5)),pY(getPrice(0.618)));
+        if(gY2>pp.y && gY1<pp.y+pp.h) {
+          ctx.fillStyle='rgba(251,143,68,0.07)';
+          ctx.fillRect(PAD_L,Math.max(gY1,pp.y),W-PAD_L-PAD_R,Math.min(gY2,pp.y+pp.h)-Math.max(gY1,pp.y));
+          ctx.fillStyle='rgba(251,143,68,0.5)';ctx.font='bold 8px "JetBrains Mono"';ctx.textAlign='left';
+          ctx.fillText('GOLDEN ZONE  50%–61.8%',PAD_L+6,Math.max(gY1,pp.y)+11);
+        }
 
-      // Swing point markers — dot at detected high (red) and low (green)
-      const hiX=toX(hiIdx), hiY_=pY(swingHi);
-      const loX=toX(loIdx), loY_=pY(swingLo);
-      ctx.fillStyle='rgba(248,81,73,0.9)';
-      ctx.beginPath(); ctx.arc(hiX, hiY_-7, 4, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle='rgba(63,185,80,0.9)';
-      ctx.beginPath(); ctx.arc(loX, loY_+7, 4, 0, Math.PI*2); ctx.fill();
+        // Confluence check — MAs and S/R within 1% of level price
+        const n2=closes.length;
+        const maChecks=[ma20[n2-1],ma50[n2-1],ma200[n2-1]].filter(v=>v!=null);
 
-      // "AUTO FIB" badge top-left of chart
-      ctx.fillStyle='rgba(251,143,68,0.65)';
-      ctx.font='bold 8px "JetBrains Mono"';ctx.textAlign='left';
-      ctx.fillText('AUTO FIB \u2022 '+(uptrend?'UPTREND':'DOWNTREND'), PAD_L+4, pp.y+14);
+        // Draw level lines
+        allLevels.forEach(({pct,label,color,lw})=>{
+          const price=getPrice(pct);
+          const y=pY(price);
+          if(y<pp.y-1||y>pp.y+pp.h+1) return;
+
+          let isConf=false;
+          if(fibShowConfluence){
+            isConf=maChecks.some(mv=>Math.abs(mv-price)/price<0.01)
+              ||[...nearRes,...nearSup].some(sr=>Math.abs(sr-price)/price<0.008);
+          }
+
+          ctx.save();
+          const col=isConf?color.replace(/[\d.]+\)$/,'1)'):color;
+          ctx.strokeStyle=col; ctx.lineWidth=isConf?lw+1:lw;
+          ctx.setLineDash(isConf?[]:[6,4]);
+          ctx.beginPath();ctx.moveTo(PAD_L,y);ctx.lineTo(W-PAD_R,y);ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle=col;
+          ctx.font=(isConf||lw>1?'bold ':'')+' 9px "JetBrains Mono"';
+          ctx.textAlign='right'; ctx.fillText(label,PAD_L-4,y+3);
+          ctx.textAlign='left';  ctx.fillText('$'+price.toFixed(2)+(isConf?' ⬡':''),W-PAD_R+2,y+3);
+          if(isConf){
+            ctx.fillStyle='rgba(251,143,68,0.1)';
+            ctx.fillRect(PAD_L,y-9,W-PAD_L-PAD_R,18);
+            ctx.fillStyle='rgba(251,143,68,0.75)';
+            ctx.font='bold 7px "JetBrains Mono"';ctx.textAlign='center';
+            ctx.fillText('CONFLUENCE',PAD_L+(W-PAD_L-PAD_R)/2,y+3);
+          }
+          ctx.restore();
+        });
+
+        // ── Fan Lines ──
+        if(fibShowFans) {
+          const originIdx = uptrend ? swingLoIdx : swingHiIdx;
+          const originP   = uptrend ? swingLo    : swingHi;
+          const anchorIdx = uptrend ? swingHiIdx : swingLoIdx;
+          const ox=toX(originIdx), oy=pY(originP), ax=toX(anchorIdx);
+          const fanPcts=[0.236,0.382,0.5,0.618,0.786];
+          const fanCols=['rgba(57,197,207,0.55)','rgba(88,166,255,0.65)','rgba(210,153,34,0.65)','rgba(251,143,68,0.8)','rgba(163,113,247,0.65)'];
+          ctx.save();
+          fanPcts.forEach((pct,i)=>{
+            const tp=uptrend ? swingLo+pct*fibRange : swingHi-pct*fibRange;
+            const ty=pY(tp);
+            const dx=ax-ox, dy=ty-oy;
+            if(Math.abs(dx)<1) return;
+            const tR=(W-PAD_R-ox)/dx, tL=(PAD_L-ox)/dx;
+            const yR=oy+dy*tR, yL=oy+dy*tL;
+            ctx.strokeStyle=fanCols[i];ctx.lineWidth=1;ctx.setLineDash([4,6]);
+            ctx.beginPath();ctx.moveTo(PAD_L,yL);ctx.lineTo(W-PAD_R,yR);ctx.stroke();
+            ctx.setLineDash([]);
+            if(yR>pp.y&&yR<pp.y+pp.h){
+              ctx.fillStyle=fanCols[i];ctx.font='8px "JetBrains Mono"';ctx.textAlign='left';
+              ctx.fillText((pct*100).toFixed(1)+'%',W-PAD_R+2,yR+3);
+            }
+          });
+          ctx.fillStyle='rgba(251,143,68,0.85)';
+          ctx.beginPath();ctx.arc(ox,oy,4,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='rgba(251,143,68,0.65)';ctx.font='bold 8px "JetBrains Mono"';ctx.textAlign='center';
+          ctx.fillText('FAN ORIGIN',ox,oy+(uptrend?14:-8));
+          ctx.restore();
+        }
+
+        // ── Time Zones ──
+        if(fibShowTimeZones) {
+          const startI=Math.min(swingHiIdx,swingLoIdx);
+          const fibSeq=[1,2,3,5,8,13,21,34,55,89];
+          ctx.save();
+          ctx.font='bold 8px "JetBrains Mono"';
+          fibSeq.forEach((fn,i)=>{
+            const bi=startI+fn;
+            if(bi<0||bi>=visData.length) return;
+            const x=toX(bi), alpha=Math.max(0.12,0.55-i*0.05);
+            ctx.strokeStyle=`rgba(88,166,255,${alpha})`;ctx.lineWidth=1;ctx.setLineDash([3,5]);
+            ctx.beginPath();ctx.moveTo(x,pp.y);ctx.lineTo(x,pp.y+pp.h);ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle=`rgba(88,166,255,${alpha+0.2})`;ctx.textAlign='center';
+            ctx.fillText(fn,x,pp.y+pp.h-4);
+          });
+          ctx.fillStyle='rgba(88,166,255,0.45)';ctx.font='bold 7px "JetBrains Mono"';ctx.textAlign='left';
+          ctx.fillText('FIB TIME ZONES',PAD_L+4,pp.y+pp.h-14);
+          ctx.restore();
+        }
+
+        // Swing point markers
+        ctx.fillStyle='rgba(248,81,73,0.9)';
+        ctx.beginPath();ctx.arc(toX(swingHiIdx),pY(swingHi)-7,4,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(63,185,80,0.9)';
+        ctx.beginPath();ctx.arc(toX(swingLoIdx),pY(swingLo)+7,4,0,Math.PI*2);ctx.fill();
+
+        // Badge
+        const badge=(fibMode==='manual'?'MANUAL FIB':'AUTO FIB')+' \u2022 '+(uptrend?'UPTREND':'DOWNTREND');
+        ctx.fillStyle='rgba(251,143,68,0.7)';ctx.font='bold 8px "JetBrains Mono"';ctx.textAlign='left';
+        ctx.fillText(badge,PAD_L+4,pp.y+14);
+      }
     }
   }
 
@@ -3110,6 +3314,25 @@ function setupChartEvents() {
     }
     isDragging = false;
     canvas.style.cursor = 'crosshair';
+  });
+
+  // Fibonacci manual swing-point selection
+  canvas.addEventListener('click', e => {
+    if(!ind.fib || fibMode !== 'manual' || !rawData.length) return;
+    if(isDragging) return;
+    const rect  = canvas.getBoundingClientRect();
+    const mx    = e.clientX - rect.left;
+    const PAD_L = 62, PAD_R = 60;
+    const chartW= rect.width - PAD_L - PAD_R;
+    const step  = chartW / (viewCount + 1);
+    const rawIdx= Math.round((mx - PAD_L) / step - 0.5);
+    if(rawIdx < 0 || rawIdx >= viewCount) return;
+    const absIdx = viewStart + rawIdx;
+    const d = rawData[absIdx];
+    if(!d) return;
+    if(fibManualSwings.length >= 2) fibManualSwings = [];
+    fibManualSwings.push({ absIdx, high:d.high, low:d.low, close:d.close });
+    drawChart();
   });
 
   // Double-click = reset zoom
@@ -3724,6 +3947,60 @@ async function loadCatalysts() {
     }).join('');
   } catch(e) {
     el.innerHTML=`<div class="picks-loading" style="color:var(--red)">⚠ ${e.message}</div>`;
+  }
+}
+
+async function loadCompanyNews(sym) {
+  // Sidebar panel
+  const sidePanel = document.getElementById('companyNewsPanel');
+  const sideEl    = document.getElementById('companyNewsContainer');
+  const sideTitle = document.getElementById('companyNewsTitle');
+  // Under-chart panel
+  const underPanel = document.getElementById('chartNewsUnder');
+  const underGrid  = document.getElementById('chartNewsUnderGrid');
+  const underTitle = document.getElementById('chartNewsTicker');
+
+  if(sidePanel)  { sidePanel.style.display=''; if(sideTitle) sideTitle.textContent=`${sym} — Latest News`; }
+  if(underPanel) { underPanel.style.display=''; if(underTitle) underTitle.textContent=`📰 ${sym} — Latest News`; }
+
+  const loadingHtml = '<div style="padding:18px;text-align:center;color:var(--text3);font-size:11px;grid-column:1/-1;">Loading headlines…</div>';
+  if(sideEl)   sideEl.innerHTML   = loadingHtml;
+  if(underGrid) underGrid.innerHTML = loadingHtml;
+
+  try {
+    const to   = new Date().toISOString().split('T')[0];
+    const from = new Date(Date.now()-7*864e5).toISOString().split('T')[0];
+    const items = await finnhubFetch(`/company-news?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}`);
+    const news  = (items||[]).slice(0, 12);
+
+    if(!news.length) {
+      const empty = '<div style="padding:18px;text-align:center;color:var(--text3);font-size:11px;grid-column:1/-1;">No recent news found</div>';
+      if(sideEl)    sideEl.innerHTML   = empty;
+      if(underGrid) underGrid.innerHTML = empty;
+      return;
+    }
+
+    const renderItem = n => {
+      const age  = timeAgo(n.datetime * 1000);
+      const sent = n.sentiment > 0.1 ? 'bull' : n.sentiment < -0.1 ? 'bear' : 'neut';
+      const sentLabel = sent==='bull' ? 'BULLISH' : sent==='bear' ? 'BEARISH' : 'NEUTRAL';
+      const safeUrl = n.url ? n.url.replace(/'/g,'%27') : '#';
+      return `<div class="news-item" onclick="window.open('${safeUrl}','_blank')">
+        <div class="news-headline">${n.headline}</div>
+        <div class="news-meta">
+          <span class="news-source">${n.source||''}</span>
+          <span>${age}</span>
+          <span class="news-sentiment ns-${sent}">${sentLabel}</span>
+        </div>
+      </div>`;
+    };
+
+    if(sideEl)    sideEl.innerHTML    = news.slice(0,8).map(renderItem).join('');
+    if(underGrid) underGrid.innerHTML = news.slice(0,12).map(renderItem).join('');
+  } catch(e) {
+    const errHtml = `<div style="padding:14px;font-size:11px;color:var(--red);grid-column:1/-1;">⚠ ${e.message}</div>`;
+    if(sideEl)    sideEl.innerHTML    = errHtml;
+    if(underGrid) underGrid.innerHTML = errHtml;
   }
 }
 
