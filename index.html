@@ -247,6 +247,7 @@ body{
 .toggle-btn[data-ind="macd"].on .dot{background:#f85149;}
 .toggle-btn[data-ind="pred"].on .dot{background:rgba(88,166,255,.7);}
 .toggle-btn[data-ind="fib"].on .dot{background:#fb8f44;}
+.toggle-btn[data-ind="options"].on .dot{background:linear-gradient(135deg,#3fb950 50%,#f85149 50%);}
 
 /* ── Toolbar presets + grouping ── */
 .preset-btn{
@@ -1271,6 +1272,7 @@ body{
         <span class="tb-group-lbl">Advanced</span>
         <button class="toggle-btn" data-ind="pred" onclick="toggleInd('pred',this)" title="Forecast — 3 projected candles based on ATR volatility + RSI momentum + MACD direction. Shows probability range, not a guarantee."><span class="dot"></span>Forecast</button>
         <button class="toggle-btn" data-ind="tradeLines" onclick="toggleInd('tradeLines',this)" title="Trade Lines — Entry, Stop Loss, and Take Profit levels on the chart."><span class="dot"></span>Levels</button>
+        <button class="toggle-btn" data-ind="options" onclick="toggleInd('options',this)" title="Options Signals — marks CALL entry zones (green) and PUT entry zones (red) on the chart based on MACD crossovers and RSI extremes. CALL = bullish entry for call options or long positions. PUT = bearish entry for put options or short positions."><span class="dot"></span>Calls/Puts</button>
         <div class="tb-sep"></div>
         <button class="toggle-btn" id="selModeBtn" onclick="toggleSelMode()" title="Shift+drag also works">&#8862; Zoom</button>
         <button class="toggle-btn" id="resetZoomBtn" onclick="resetZoom()" style="display:none" title="Reset to full view">&#8617; Reset</button>
@@ -1534,7 +1536,7 @@ let indicators  = {};
 let ind = {
   ma20:false, ma50:true, ma200:false, ema9:false,
   bb:false, vwap:false, volume:true, rsi:false, macd:false, pred:false, tradeLines:false,
-  fib:false
+  fib:false, options:false
 };
 // Chart view state
 let viewStart = 0;   // index of first visible candle
@@ -2886,6 +2888,120 @@ function drawChart() {
         ctx.fillText(badge,PAD_L+4,pp.y+14);
       }
     }
+  }
+
+  // ── Options Signals (Calls / Puts) ──
+  if(ind.options && visData.length >= 20) {
+    const vRSI  = indicators.rsi.slice(viewStart, viewStart+viewCount);
+    const vMACD = indicators.macd.slice(viewStart, viewStart+viewCount);
+    const vSig  = indicators.signal.slice(viewStart, viewStart+viewCount);
+
+    // Collect all signal bars in the visible window
+    const signals = []; // {i, type:'call'|'put', reason}
+    for(let i=1; i<visData.length; i++) {
+      const rNow  = vRSI[i],  rPrev = vRSI[i-1];
+      const mNow  = vMACD[i], mPrev = vMACD[i-1];
+      const sNow  = vSig[i],  sPrev = vSig[i-1];
+      if(rNow==null||mNow==null) continue;
+
+      // CALL triggers: MACD bullish cross OR RSI crossing below 30 (oversold entry)
+      const macdBullCross = mNow>sNow && mPrev!=null && sPrev!=null && mPrev<=sPrev;
+      const rsiOversold   = rNow<30 && rPrev!=null && rPrev>=30;
+
+      // PUT triggers: MACD bearish cross OR RSI crossing above 70 (overbought entry)
+      const macdBearCross = mNow<sNow && mPrev!=null && sPrev!=null && mPrev>=sPrev;
+      const rsiOverbought = rNow>70 && rPrev!=null && rPrev<=70;
+
+      if(macdBullCross || rsiOversold) {
+        const reason = macdBullCross && rsiOversold ? 'MACD Cross + RSI Oversold'
+                     : macdBullCross ? 'MACD Bullish Cross' : 'RSI Oversold';
+        // Don't stack same type — use latest
+        if(signals.length && signals[signals.length-1].type==='call' && i-signals[signals.length-1].i<5) {
+          signals[signals.length-1] = {i, type:'call', reason};
+        } else {
+          signals.push({i, type:'call', reason});
+        }
+      } else if(macdBearCross || rsiOverbought) {
+        const reason = macdBearCross && rsiOverbought ? 'MACD Cross + RSI Overbought'
+                     : macdBearCross ? 'MACD Bearish Cross' : 'RSI Overbought';
+        if(signals.length && signals[signals.length-1].type==='put' && i-signals[signals.length-1].i<5) {
+          signals[signals.length-1] = {i, type:'put', reason};
+        } else {
+          signals.push({i, type:'put', reason});
+        }
+      }
+    }
+
+    // Draw zone fills between signal transitions
+    for(let s=0; s<signals.length; s++) {
+      const start = signals[s].i;
+      const end   = s+1 < signals.length ? signals[s+1].i : visData.length-1;
+      const x1 = toX(start) - step*0.5;
+      const x2 = toX(end)   + step*0.5;
+      const isCall = signals[s].type==='call';
+      ctx.fillStyle = isCall ? 'rgba(63,185,80,0.05)' : 'rgba(248,81,73,0.05)';
+      ctx.fillRect(x1, pp.y, x2-x1, pp.h);
+    }
+
+    // Draw signal markers + labels
+    signals.forEach(({i, type, reason}) => {
+      const x   = toX(i);
+      const isCall = type==='call';
+      const col    = isCall ? '#3fb950' : '#f85149';
+      const colA   = isCall ? 'rgba(63,185,80,0.85)' : 'rgba(248,81,73,0.85)';
+      const label  = isCall ? '▲ CALL' : '▼ PUT';
+      const barY   = isCall ? pY(visData[i].low)  - 18 : pY(visData[i].high) + 18;
+      const clampY = Math.max(pp.y+8, Math.min(pp.y+pp.h-8, barY));
+
+      // Vertical signal line
+      ctx.save();
+      ctx.strokeStyle = colA; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(x, pp.y); ctx.lineTo(x, pp.y+pp.h); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Arrow marker
+      ctx.fillStyle = colA;
+      ctx.beginPath();
+      if(isCall) {
+        ctx.moveTo(x,     clampY);
+        ctx.lineTo(x-6,   clampY+10);
+        ctx.lineTo(x+6,   clampY+10);
+      } else {
+        ctx.moveTo(x,     clampY);
+        ctx.lineTo(x-6,   clampY-10);
+        ctx.lineTo(x+6,   clampY-10);
+      }
+      ctx.closePath(); ctx.fill();
+
+      // Label box
+      ctx.font = 'bold 9px "JetBrains Mono"';
+      const tw = ctx.measureText(label).width + 8;
+      const ly = isCall ? clampY-26 : clampY+14;
+      const lyC= Math.max(pp.y+4, Math.min(pp.y+pp.h-16, ly));
+      ctx.fillStyle = isCall ? 'rgba(63,185,80,0.18)' : 'rgba(248,81,73,0.18)';
+      ctx.beginPath(); ctx.roundRect(x-tw/2, lyC, tw, 14, 3); ctx.fill();
+      ctx.strokeStyle = colA; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(x-tw/2, lyC, tw, 14, 3); ctx.stroke();
+      ctx.fillStyle = col; ctx.textAlign = 'center';
+      ctx.fillText(label, x, lyC+10);
+
+      // Reason tooltip — tiny text below label
+      ctx.font = '7px "JetBrains Mono"';
+      ctx.fillStyle = colA;
+      const ry = isCall ? lyC-5 : lyC+20;
+      const ryC= Math.max(pp.y+4, Math.min(pp.y+pp.h-8, ry));
+      ctx.fillText(reason, x, ryC);
+      ctx.restore();
+    });
+
+    // Legend
+    ctx.save();
+    ctx.font = 'bold 8px "JetBrains Mono"';
+    ctx.fillStyle = 'rgba(63,185,80,0.8)';  ctx.textAlign='left';
+    ctx.fillText('▲ CALL ZONE', PAD_L+4, pp.y+pp.h-24);
+    ctx.fillStyle = 'rgba(248,81,73,0.8)';
+    ctx.fillText('▼ PUT ZONE',  PAD_L+80, pp.y+pp.h-24);
+    ctx.restore();
   }
 
   // S/R lines
