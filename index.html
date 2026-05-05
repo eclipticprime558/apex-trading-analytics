@@ -2754,7 +2754,7 @@ function setFcMode(mode, btn) {
 function drawForecastChart() {
   const panel  = document.getElementById('forecastPanel');
   const canvas = document.getElementById('forecastCanvas');
-  if(!panel || !canvas || !indicators || !indicators.pred) return;
+  if(!panel || !canvas || !indicators || !indicators.pred || !rawData.length) return;
 
   const days     = _fcMode === 'week' ? 5 : 20;
   const histBars = _fcMode === 'week' ? 30 : 60;
@@ -2762,35 +2762,39 @@ function drawForecastChart() {
   const { closes, returns } = indicators;
   const { bias, lastATR, confPct } = indicators.pred;
 
-  const histPrices  = closes.slice(-histBars);
+  // Pull actual OHLC history for mini candlesticks
+  const histCandles = rawData.slice(-histBars);
   const lastPrice   = closes[closes.length - 1];
 
-  // Mean + sigma from recent returns
-  const recentR = returns.slice(-40).filter(r => r != null && isFinite(r));
-  const mu      = recentR.length ? avg(recentR) : 0;
-  const sigma   = recentR.length > 1 ? stdDev(recentR) : Math.abs(mu) || 0.01;
+  // Returns are stored as PERCENTAGES (e.g. 1.2 = 1.2%) — convert to decimals
+  const recentR   = returns.slice(-40).filter(r => r != null && isFinite(r));
+  const mu_pct    = recentR.length ? avg(recentR) : 0;
+  const sigma_pct = recentR.length > 1 ? stdDev(recentR) : Math.max(Math.abs(mu_pct), 0.5);
+  const mu    = mu_pct    / 100;   // e.g. 0.012 = 1.2%/day
+  const sigma = sigma_pct / 100;   // e.g. 0.015 = 1.5%/day
 
-  // Directional bias nudge (keep small to avoid unrealistic drift)
-  const adjMu = mu + bias * sigma * 0.25;
+  // Bias nudge — small directional tilt
+  const adjMu = mu + bias * sigma * 0.3;
 
-  // Build scenario paths (geometric / log-normal style)
-  const basePath = [lastPrice];
-  const bullPath = [lastPrice];
-  const bearPath = [lastPrice];
-  const outerBull= [lastPrice];
-  const outerBear= [lastPrice];
+  // Build forward scenario paths using proper log-normal scaling
+  const basePath  = [lastPrice];
+  const bullPath  = [lastPrice];
+  const bearPath  = [lastPrice];
+  const outerBull = [lastPrice];
+  const outerBear = [lastPrice];
   for(let i = 1; i <= days; i++) {
-    basePath.push(lastPrice * Math.exp(adjMu * i));
-    bullPath.push(lastPrice * Math.exp((adjMu + sigma)   * i));
-    bearPath.push(lastPrice * Math.exp((adjMu - sigma)   * i));
-    outerBull.push(lastPrice * Math.exp((adjMu + 1.8*sigma) * i));
-    outerBear.push(lastPrice * Math.exp((adjMu - 1.8*sigma) * i));
+    const sqrtT = Math.sqrt(i);
+    basePath .push(lastPrice * Math.exp(adjMu * i));
+    bullPath .push(lastPrice * Math.exp(adjMu * i + sigma * sqrtT));
+    bearPath .push(lastPrice * Math.exp(adjMu * i - sigma * sqrtT));
+    outerBull.push(lastPrice * Math.exp(adjMu * i + 1.75 * sigma * sqrtT));
+    outerBear.push(lastPrice * Math.exp(adjMu * i - 1.75 * sigma * sqrtT));
   }
 
   // Canvas sizing
   const dpr = window.devicePixelRatio || 1;
-  const W   = panel.clientWidth || 700;
-  const H   = 240;
+  const W   = Math.max(panel.clientWidth, 400);
+  const H   = 260;
   canvas.width  = W * dpr;
   canvas.height = H * dpr;
   canvas.style.width  = W + 'px';
@@ -2798,49 +2802,76 @@ function drawForecastChart() {
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const padL = 62, padR = 56, padT = 18, padB = 36;
+  const padL = 66, padR = 68, padT = 22, padB = 38;
   const cW = W - padL - padR;
   const cH = H - padT - padB;
   const totalBars = histBars + days;
-  const barW = cW / totalBars;
+  const bW = cW / totalBars;          // width per bar
+  const cW2 = Math.max(1, bW * 0.55); // candle body width
 
-  const xOf = i => padL + (i + 0.5) * barW;
-  const allP = [...histPrices, ...outerBull.slice(1), ...outerBear.slice(1)];
-  const minP = Math.min(...allP) * 0.997;
-  const maxP = Math.max(...allP) * 1.003;
+  const xOf = i => padL + (i + 0.5) * bW;
+
+  // Price range: history highs/lows + outer forecast bands
+  const histHighs = histCandles.map(c => c.high);
+  const histLows  = histCandles.map(c => c.low);
+  const allP = [
+    ...histHighs, ...histLows,
+    ...outerBull.slice(1), ...outerBear.slice(1)
+  ];
+  const minP = Math.min(...allP) * 0.996;
+  const maxP = Math.max(...allP) * 1.004;
   const rng  = maxP - minP || 1;
   const yOf  = p => padT + (1 - (p - minP) / rng) * cH;
 
   ctx.clearRect(0, 0, W, H);
 
-  // Grid lines + Y labels
-  const steps = 5;
+  // Background tint for forecast zone
+  ctx.fillStyle = 'rgba(88,166,255,0.03)';
+  const todayX = xOf(histBars - 1);
+  ctx.fillRect(todayX, padT, W - padR - todayX, cH);
+
+  // Horizontal grid lines + Y price labels
+  const steps = 6;
   for(let i = 0; i <= steps; i++) {
     const p = minP + (rng / steps) * i;
     const y = yOf(p);
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([]);
+    ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
-    ctx.fillStyle = 'rgba(139,148,158,.65)';
+    ctx.fillStyle = 'rgba(139,148,158,.6)';
     ctx.font = '10px Inter,sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('$' + p.toFixed(2), padL - 5, y + 3.5);
   }
 
-  // "Today" divider
-  const todayX = xOf(histBars - 1);
-  ctx.strokeStyle = 'rgba(139,148,158,.35)';
-  ctx.setLineDash([5, 4]);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(todayX, padT - 6); ctx.lineTo(todayX, H - padB); ctx.stroke();
+  // "NOW" divider line
+  ctx.strokeStyle = 'rgba(139,148,158,.4)';
+  ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(todayX, padT - 4); ctx.lineTo(todayX, H - padB + 4); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(139,148,158,.6)';
-  ctx.font = 'bold 9px Inter,sans-serif';
-  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(139,148,158,.7)';
+  ctx.font = 'bold 9px Inter,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('NOW', todayX, padT - 8);
 
-  // Outer confidence band fill
+  // ── Historical mini candlesticks ──
+  histCandles.forEach((c, i) => {
+    const x    = xOf(i);
+    const up   = c.close >= c.open;
+    const colF = up ? 'rgba(63,185,80,0.85)'  : 'rgba(248,81,73,0.85)';
+    const colS = up ? 'rgba(63,185,80,1)'     : 'rgba(248,81,73,1)';
+    const yO = yOf(c.open), yC = yOf(c.close);
+    const yH = yOf(c.high), yL = yOf(c.low);
+    // Wick
+    ctx.strokeStyle = colS; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+    // Body
+    const bodyTop = Math.min(yO, yC);
+    const bodyH   = Math.max(Math.abs(yO - yC), 1);
+    ctx.fillStyle = colF;
+    ctx.fillRect(x - cW2 / 2, bodyTop, cW2, bodyH);
+  });
+
+  // ── Outer confidence band (±1.75σ) ──
   ctx.beginPath();
   for(let i = 0; i <= days; i++) {
     const x = xOf(histBars - 1 + i), y = yOf(outerBull[i]);
@@ -2848,10 +2879,9 @@ function drawForecastChart() {
   }
   for(let i = days; i >= 0; i--) ctx.lineTo(xOf(histBars - 1 + i), yOf(outerBear[i]));
   ctx.closePath();
-  ctx.fillStyle = 'rgba(88,166,255,0.055)';
-  ctx.fill();
+  ctx.fillStyle = 'rgba(88,166,255,0.06)'; ctx.fill();
 
-  // Inner band fill (±1σ)
+  // ── Inner band (±1σ) ──
   ctx.beginPath();
   for(let i = 0; i <= days; i++) {
     const x = xOf(histBars - 1 + i), y = yOf(bullPath[i]);
@@ -2859,90 +2889,79 @@ function drawForecastChart() {
   }
   for(let i = days; i >= 0; i--) ctx.lineTo(xOf(histBars - 1 + i), yOf(bearPath[i]));
   ctx.closePath();
-  ctx.fillStyle = 'rgba(88,166,255,0.11)';
-  ctx.fill();
+  ctx.fillStyle = 'rgba(88,166,255,0.13)'; ctx.fill();
 
-  // Helper: draw line
-  const drawLine = (path, color, width, dash=[]) => {
+  // Helper to stroke a path from array of [x,y] points
+  const drawLine = (pts, color, width, dash=[]) => {
+    if(!pts.length) return;
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash);
-    for(let i = 0; i < path.length; i++) {
-      const x = path[i][0], y = path[i][1];
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
+    pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
     ctx.stroke(); ctx.setLineDash([]);
   };
 
-  // Historical line
-  drawLine(
-    histPrices.map((p,i) => [xOf(i), yOf(p)]),
-    'rgba(139,148,158,0.55)', 1.5
-  );
+  // Bull / Bear boundary lines (dashed)
+  drawLine(bullPath.map((p,i) => [xOf(histBars-1+i), yOf(p)]), 'rgba(63,185,80,0.7)',  1.5, [6,4]);
+  drawLine(bearPath.map((p,i) => [xOf(histBars-1+i), yOf(p)]), 'rgba(248,81,73,0.7)', 1.5, [6,4]);
 
-  // Bull / Bear dashed lines
-  drawLine(
-    bullPath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
-    'rgba(63,185,80,0.75)', 1.5, [6,4]
-  );
-  drawLine(
-    bearPath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
-    'rgba(248,81,73,0.75)', 1.5, [6,4]
-  );
+  // Base case projection (solid blue, thicker)
+  drawLine(basePath.map((p,i) => [xOf(histBars-1+i), yOf(p)]), '#58a6ff', 2.5);
 
-  // Base case — bright solid line
-  drawLine(
-    basePath.map((p,i) => [xOf(histBars - 1 + i), yOf(p)]),
-    'rgba(88,166,255,0.92)', 2.5
-  );
-
-  // End dots + price labels
+  // End-point dots + price labels
   const endX = xOf(histBars - 1 + days);
-  [
-    [basePath[days], '#58a6ff', 4.5],
-    [bullPath[days], '#3fb950', 3.5],
-    [bearPath[days], '#f85149', 3.5],
-  ].forEach(([p, c, r]) => {
-    ctx.beginPath();
-    ctx.arc(endX, yOf(p), r, 0, Math.PI*2);
-    ctx.fillStyle = c;
-    ctx.fill();
-  });
-  [
-    [basePath[days], '#58a6ff', 'bold 10px'],
-    [bullPath[days], '#3fb950', '10px'],
-    [bearPath[days], '#f85149', '10px'],
-  ].forEach(([p, c, f]) => {
-    ctx.fillStyle = c;
-    ctx.font = f + ' Inter,sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('$' + p.toFixed(2), endX + 6, yOf(p) + 3.5);
+  const dotData = [
+    [outerBull[days], 'rgba(63,185,80,0.4)',  2.5, null, null],
+    [bullPath[days],  '#3fb950',               3.5, '#3fb950', '10px'],
+    [bearPath[days],  '#f85149',               3.5, '#f85149', '10px'],
+    [outerBear[days], 'rgba(248,81,73,0.4)',  2.5, null, null],
+    [basePath[days],  '#58a6ff',               5,   '#58a6ff', 'bold 11px'],
+  ];
+  dotData.forEach(([p, dotC, r, labelC, font]) => {
+    ctx.beginPath(); ctx.arc(endX, yOf(p), r, 0, Math.PI*2);
+    ctx.fillStyle = dotC; ctx.fill();
+    if(labelC && font) {
+      ctx.fillStyle = labelC;
+      ctx.font = font + ' Inter,sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('$' + p.toFixed(2), endX + 7, yOf(p) + 3.5);
+    }
   });
 
-  // X-axis date labels
-  const today = new Date();
-  ctx.fillStyle = 'rgba(139,148,158,.55)';
-  ctx.font = '9px Inter,sans-serif';
-  ctx.textAlign = 'center';
-  const interval = Math.ceil(days / 4);
-  for(let i = 0; i <= days; i += interval) {
-    const d = new Date(today); d.setDate(d.getDate() + i);
+  // X-axis: historical date labels (every ~7 bars)
+  ctx.fillStyle = 'rgba(139,148,158,.5)';
+  ctx.font = '9px Inter,sans-serif'; ctx.textAlign = 'center';
+  const labelInterval = Math.max(1, Math.round(histBars / 5));
+  histCandles.forEach((c, i) => {
+    if(i % labelInterval === 0 || i === histBars - 1) {
+      ctx.fillText(
+        c.date.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
+        xOf(i), H - padB + 14
+      );
+    }
+  });
+
+  // X-axis: forecast date labels
+  const lastDate = histCandles[histCandles.length - 1]?.date || new Date();
+  const fwdInterval = Math.max(1, Math.ceil(days / 4));
+  for(let i = fwdInterval; i <= days; i += fwdInterval) {
+    const d = new Date(lastDate); d.setDate(d.getDate() + i);
     ctx.fillText(
       d.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
       xOf(histBars - 1 + i), H - padB + 14
     );
   }
-  // Also label "today" on x axis
-  ctx.fillText(
-    today.toLocaleDateString('en-US', {month:'short', day:'numeric'}),
-    todayX, H - padB + 14
-  );
 
-  // Summary text
-  const direction = basePath[days] > lastPrice ? '▲' : '▼';
-  const changePct = ((basePath[days] - lastPrice) / lastPrice * 100).toFixed(1);
-  const biasLabel = bias > 0.2 ? 'BULLISH' : bias < -0.2 ? 'BEARISH' : 'NEUTRAL';
-  const biasColor = bias > 0.2 ? '#3fb950' : bias < -0.2 ? '#f85149' : '#e3b341';
+  // Summary strip
+  const direction  = basePath[days] > lastPrice ? '▲' : '▼';
+  const changePct  = ((basePath[days] - lastPrice) / lastPrice * 100).toFixed(1);
+  const biasLabel  = bias > 0.2 ? 'BULLISH' : bias < -0.2 ? 'BEARISH' : 'NEUTRAL';
+  const biasColor  = bias > 0.2 ? '#3fb950' : bias < -0.2 ? '#f85149' : '#e3b341';
+  const bullTgt    = bullPath[days].toFixed(2);
+  const bearTgt    = bearPath[days].toFixed(2);
   document.getElementById('fcSummary').innerHTML =
-    `Base: <b style="color:${biasColor}">${biasLabel}</b> &nbsp;${direction} ${Math.abs(changePct)}% over ${days} days &nbsp;|&nbsp; Confidence: ${confPct}%`;
+    `Bias: <b style="color:${biasColor}">${biasLabel}</b> &nbsp;·&nbsp; ` +
+    `Base ${direction} ${Math.abs(changePct)}% &nbsp;·&nbsp; ` +
+    `Bull $${bullTgt} / Bear $${bearTgt} &nbsp;·&nbsp; ` +
+    `Confidence: ${confPct}% &nbsp;·&nbsp; σ/day: ${(sigma_pct).toFixed(2)}%`;
 }
 
 function updateRangeStats() {
