@@ -692,6 +692,27 @@ body{
 }
 .picks-refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
 
+/* ── Volume Statistics ── */
+.vol-stats-block{margin-top:5px;}
+.vol-cls-badge{
+  font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  padding:1px 6px;border-radius:3px;display:inline-block;margin-bottom:4px;
+}
+.vol-cls-badge.spike {background:rgba(63,185,80,.2);  color:#3fb950;}
+.vol-cls-badge.high  {background:rgba(88,166,255,.15); color:#58a6ff;}
+.vol-cls-badge.normal{background:rgba(139,148,158,.15);color:var(--text2);}
+.vol-cls-badge.low   {background:rgba(248,81,73,.12);  color:var(--red);}
+.vol-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--text3);}
+.vol-row b{color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;}
+.vol-sparkline{display:block;margin-top:4px;}
+/* Volume section in chart stats tab */
+.vol-section-title{
+  grid-column:1/-1;
+  padding:8px 10px 4px;font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--text3);border-top:1px solid var(--border);
+  margin-top:2px;
+}
+
 /* ── Analyst Consensus Target ── */
 .analyst-row{
   display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;
@@ -2997,18 +3018,49 @@ function updateStats() {
     {label:'Worst Day',value:Math.min(...ret).toFixed(2)+'%',cls:'dn'},
     {label:'Total Return',value:(totalRet>=0?'+':'')+totalRet.toFixed(2)+'%',cls:totalRet>=0?'up':'dn'},
   ];
-  document.getElementById('statsGrid').innerHTML=stats.map(s=>`
-    <div class="stat-card">
-      <div class="sc-label">${s.label}</div>
-      <div class="sc-value ${s.cls||''}">${s.value}</div>
-    </div>`).join('');
+  // Volume statistics
+  const vols       = rawData.map(d => d.volume).filter(v => v > 0);
+  const todayVol   = vols[vols.length - 1] || 0;
+  const avgVol5    = vols.length >= 5  ? avg(vols.slice(-5))  : 0;
+  const avgVol10   = vols.length >= 10 ? avg(vols.slice(-10)) : 0;
+  const avgVol20   = vols.length >= 20 ? avg(vols.slice(-20)) : 0;
+  const avgVol60   = vols.length >= 20 ? avg(vols.slice(-60)) : 0;
+  const vRatio     = avgVol60 > 0 ? todayVol / avgVol60 : 0;
+  const vPctile    = vols.slice(0,-1).filter(v => v < todayVol).length / (vols.length - 1 || 1) * 100;
+  const vTrend3r   = avg(vols.slice(-3)), vTrend3p = avg(vols.slice(-6, -3));
+  const vTrendPct  = vTrend3p > 0 ? (vTrend3r / vTrend3p - 1) * 100 : 0;
+  const maxVolDay  = rawData.reduce((mx, d) => d.volume > mx.volume ? d : mx, rawData[0]);
+  const dollarVol  = rawData[rawData.length-1].close * todayVol;
+  const vCls       = vRatio >= 3 ? 'spike' : vRatio >= 1.5 ? 'high' : vRatio < 0.6 ? 'low' : 'normal';
+  const vClsColor  = {spike:'var(--green)', high:'var(--accent)', normal:'var(--text2)', low:'var(--red)'}[vCls];
+
+  const volStats = [
+    {label:'Today Vol',      value:fmtLarge(todayVol),                   cls: vRatio>1.5?'up':vRatio<0.6?'dn':''},
+    {label:'vs 3M Avg',      value:vRatio.toFixed(2)+'×',                cls: vRatio>1.5?'up':vRatio<0.6?'dn':''},
+    {label:'Avg Vol 5D',     value:fmtLarge(Math.round(avgVol5))},
+    {label:'Avg Vol 10D',    value:fmtLarge(Math.round(avgVol10))},
+    {label:'Avg Vol 20D',    value:fmtLarge(Math.round(avgVol20))},
+    {label:'Avg Vol 60D',    value:fmtLarge(Math.round(avgVol60))},
+    {label:'Vol Pctile',     value:Math.round(vPctile)+'th',             cls: vPctile>85?'up':vPctile<20?'dn':''},
+    {label:'3-Day Trend',    value:(vTrendPct>=0?'+':'')+vTrendPct.toFixed(1)+'%', cls:vTrendPct>15?'up':vTrendPct<-15?'dn':''},
+    {label:'Dollar Vol',     value:'$'+fmtLarge(dollarVol)},
+    {label:'Peak Vol Day',   value:maxVolDay?.date.toLocaleDateString('en-US',{month:'short',day:'numeric'}) ?? '—'},
+    {label:'Peak Vol',       value:fmtLarge(maxVolDay?.volume ?? 0)},
+    {label:'Classification', value:{spike:'🔥 Spike', high:'↑ High', normal:'Normal', low:'↓ Low'}[vCls], cls:vCls==='spike'?'up':vCls==='low'?'dn':''},
+  ];
+
+  document.getElementById('statsGrid').innerHTML =
+    stats.map(s=>`<div class="stat-card"><div class="sc-label">${s.label}</div><div class="sc-value ${s.cls||''}">${s.value}</div></div>`).join('') +
+    `<div class="vol-section-title">📦 Volume Statistics</div>` +
+    volStats.map(s=>`<div class="stat-card"><div class="sc-label">${s.label}</div><div class="sc-value ${s.cls||''}">${s.value}</div></div>`).join('');
 
   document.getElementById('indsContent').innerHTML=`
     <div class="ind-row"><span class="ind-label">Skewness</span><span class="ind-val ${skew>0?'up':'dn'}">${skew.toFixed(3)}</span></div>
     <div class="ind-row"><span class="ind-label">Kurtosis</span><span class="ind-val">${kurt.toFixed(3)}</span></div>
     <div class="ind-row"><span class="ind-label">Consec. Up</span><span class="ind-val up">${maxUp} days</span></div>
     <div class="ind-row"><span class="ind-label">Consec. Down</span><span class="ind-val dn">${maxDn} days</span></div>
-    <div class="ind-row"><span class="ind-label">Avg Volume</span><span class="ind-val">${fmtLarge(Math.round(avg(rawData.map(d=>d.volume))))}</span></div>
+    <div class="ind-row"><span class="ind-label">Avg Volume</span><span class="ind-val">${fmtLarge(Math.round(avgVol60))}</span></div>
+    <div class="ind-row"><span class="ind-label">Vol Pctile</span><span class="ind-val ${vPctile>85?'up':vPctile<20?'dn':''}">${Math.round(vPctile)}th</span></div>
     <div class="ind-row"><span class="ind-label">Records</span><span class="ind-val">${rawData.length}</span></div>`;
 }
 
@@ -4367,6 +4419,20 @@ async function fetchPickQuote(sym) {
   const latestVol = meta.regularMarketVolume ?? (volumes.length ? volumes[volumes.length-1] : null);
   const avgVol    = volumes.length > 5 ? Math.round(volumes.slice(-60).reduce((a,b)=>a+b,0) / Math.min(volumes.length,60)) : null;
 
+  // Extended volume stats from candle history
+  const vol5d   = volumes.length >= 5  ? Math.round(avg(volumes.slice(-5)))  : null;
+  const vol10d  = volumes.length >= 10 ? Math.round(avg(volumes.slice(-10))) : null;
+  const vol20d  = volumes.length >= 20 ? Math.round(avg(volumes.slice(-20))) : null;
+  const volPctile = (latestVol && volumes.length > 20)
+    ? Math.round(volumes.slice(0, -1).filter(v => v < latestVol).length / (volumes.length - 1) * 100)
+    : null;
+  // Volume trend: last-3-day avg vs prior-3-day avg
+  const v3r = volumes.length >= 6 ? avg(volumes.slice(-3)) : 0;
+  const v3p = volumes.length >= 6 ? avg(volumes.slice(-6, -3)) : 0;
+  const volTrendPct = v3p > 0 ? (v3r / v3p - 1) * 100 : 0;
+  const dollarVol   = (price && latestVol) ? price * latestVol : null;
+  const volBars     = volumes.slice(-15); // for sparkline
+
   dbg(`${sym}: ${label} ${score} | price=${price?.toFixed(2)} chg=${changePct?.toFixed(2)}%`,'ok');
 
   return {
@@ -4391,6 +4457,11 @@ async function fetchPickQuote(sym) {
     shortPct,                 // short % of float (e.g. 0.04 = 4%)
     shortRatio,               // days to cover
     shortPriorPct,            // % change in shares short vs prior month
+    vol5d, vol10d, vol20d,    // rolling average volumes
+    volPctile,                // percentile rank of today's vol vs past year
+    volTrendPct,              // 3-day vol avg vs prior 3-day avg (%)
+    dollarVol,                // price × volume
+    volBars,                  // last 15 daily volumes for sparkline
     // MoM price change: current close vs ~22 trading days ago
     momPct: candles.length >= 23
       ? ((candles[candles.length-1].close - candles[candles.length-23].close) / candles[candles.length-23].close * 100)
@@ -4666,6 +4737,60 @@ document.addEventListener('mousemove', e => {
   if(tip.style.display === 'block') positionTip(e, tip);
 });
 
+function volSparklineSVG(bars, avgV) {
+  if(!bars || !bars.length) return '';
+  const w = 90, h = 22, n = bars.length;
+  const maxV = Math.max(...bars) || 1;
+  const bw = Math.floor(w / n) - 1;
+  const rects = bars.map((v, i) => {
+    const bh = Math.max(2, Math.round((v / maxV) * h));
+    const x  = i * (bw + 1);
+    const y  = h - bh;
+    const isSpike = avgV && v > avgV * 1.5;
+    const color   = isSpike ? '#3fb950' : '#8b949e';
+    return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${color}" rx="1"/>`;
+  }).join('');
+  // avg line
+  const avgY = avgV ? Math.round(h - (avgV / maxV) * h) : null;
+  const avgLine = avgY != null
+    ? `<line x1="0" y1="${avgY}" x2="${w}" y2="${avgY}" stroke="rgba(88,166,255,.5)" stroke-width="1" stroke-dasharray="3,2"/>`
+    : '';
+  return `<svg class="vol-sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${rects}${avgLine}</svg>`;
+}
+
+function volStatsHtml(q) {
+  const v     = q.regularMarketVolume;
+  const avg3m = q.averageDailyVolume3Month;
+  if(!v && !avg3m) return '';
+
+  const ratio   = (v && avg3m && avg3m > 0) ? v / avg3m : null;
+  const clsKey  = !ratio ? 'normal' : ratio >= 3 ? 'spike' : ratio >= 1.5 ? 'high' : ratio < 0.6 ? 'low' : 'normal';
+  const clsLbl  = {spike:'🔥 Volume Spike', high:'↑ High Volume', normal:'Normal Volume', low:'↓ Low Volume'}[clsKey];
+
+  const trend   = q.volTrendPct;
+  const trendStr= trend != null ? `${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend).toFixed(0)}% 3-day trend` : '';
+  const trendCls= trend != null ? (trend > 15 ? 'up' : trend < -15 ? 'dn' : '') : '';
+
+  const pctile  = q.volPctile != null ? `${q.volPctile}th pctile` : '';
+  const sparkline = volSparklineSVG(q.volBars, avg3m);
+
+  return `<div class="vol-stats-block">
+    <span class="vol-cls-badge ${clsKey}">${clsLbl}</span>
+    <div class="vol-row">
+      <span>Today:</span><b>${v ? fmtLarge(v) : '—'}</b>
+      ${ratio ? `<span>vs avg:</span><b>${ratio.toFixed(1)}×</b>` : ''}
+      ${pctile ? `<b class="${clsKey === 'spike' ? 'up' : ''}">${pctile}</b>` : ''}
+    </div>
+    <div class="vol-row">
+      <span>5D:</span><b>${q.vol5d ? fmtLarge(q.vol5d) : '—'}</b>
+      <span>20D:</span><b>${q.vol20d ? fmtLarge(q.vol20d) : '—'}</b>
+      ${trendStr ? `<span class="${trendCls}">${trendStr}</span>` : ''}
+    </div>
+    ${q.dollarVol ? `<div class="vol-row"><span>$ Vol:</span><b>$${fmtLarge(q.dollarVol)}</b></div>` : ''}
+    ${sparkline}
+  </div>`;
+}
+
 function shortTrendHtml(q) {
   if(q?.shortPct == null) return '';
   const pct      = (q.shortPct * 100).toFixed(1);
@@ -4732,6 +4857,7 @@ function renderPicksCol(colId, tickers, quotes) {
         <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}${q.momPct != null ? ` &nbsp;·&nbsp; <span class="${q.momPct>=0?'up':'dn'}">${q.momPct>=0?'+':''}${q.momPct.toFixed(1)}% MoM</span>` : ''}</div>
         ${analystHtml(q, q.regularMarketPrice)}
         ${shortTrendHtml(q)}
+        ${volStatsHtml(q)}
         ${factorHtml ? `<div class="pick-factors">${factorHtml}</div>` : ''}
         <button class="pick-track-btn${isTracked?' tracked':''}"
                 onclick="event.stopPropagation();togglePickTrack('${sym}',this)">${isTracked?'✓ Tracked':'★ Track'}</button>
@@ -5454,8 +5580,8 @@ function renderWatchlist(showLoading) {
         <div class="wl-bar-wrap"><div class="wl-bar-fill" style="width:${pos52??0}%;background:${barColor}"></div></div>
         <div class="wl-52w-label">${pos52Str} of 52W range</div>
       </td>
-      <td class="wl-td center wl-hide-sm">
-        <span class="wl-vol ${volCls}" title="Today's volume vs 3-month average">${volLabel}</span>
+      <td class="wl-td wl-hide-sm" style="min-width:120px;">
+        ${volStatsHtml(q)}
       </td>
       <td class="wl-td">
         <div class="wl-actions">
@@ -5491,7 +5617,7 @@ function renderWatchlist(showLoading) {
           <th class="wl-hide-sm" title="Short interest % of float, days to cover, and month-over-month change">Short Interest</th>
           <th class="center wl-hide-sm" title="Setup strength: 7 technical criteria scored as stars. Hover each dot for details.">Setup ★</th>
           <th class="wl-hide-sm">52W Position</th>
-          <th class="center wl-hide-sm">Volume</th>
+          <th class="wl-hide-sm" title="Volume today, averages, trend, percentile rank, and sparkline">Volume Stats</th>
           <th></th>
         </tr></thead>
         <tbody>${rows}</tbody>
