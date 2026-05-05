@@ -114,24 +114,24 @@ body{
 
 /* ── Indicator Rich Tooltip ── */
 #indTip{
-  position:fixed;z-index:9000;
-  background:rgba(13,17,23,.98);border:1px solid var(--border2);
-  border-radius:10px;padding:14px 16px;max-width:300px;
-  box-shadow:0 12px 40px rgba(0,0,0,.8);
-  pointer-events:none;opacity:0;transition:opacity .15s;
+  position:fixed;z-index:9500;
+  background:rgba(13,17,23,.99);border:1px solid var(--border2);
+  border-radius:12px;padding:16px 18px;width:320px;
+  box-shadow:0 16px 48px rgba(0,0,0,.9);
+  pointer-events:none;opacity:0;transition:opacity .12s;
   font-family:'Inter',sans-serif;
 }
 #indTip.visible{opacity:1;}
-.itip-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.itip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.itip-name{font-size:12px;font-weight:700;color:var(--text);}
-.itip-line{font-size:10px;color:var(--text3);margin-bottom:6px;font-style:italic;}
-.itip-desc{font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:8px;}
+.itip-header{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.itip-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px currentColor;}
+.itip-name{font-size:13px;font-weight:700;color:var(--text);}
+.itip-line{font-size:10px;color:var(--accent);margin-bottom:7px;font-style:italic;letter-spacing:.2px;}
+.itip-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px;}
 .itip-reads{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;}
-.itip-reads li{font-size:11px;line-height:1.4;padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.04);}
-.itip-reads li.bull{color:var(--green);}
-.itip-reads li.bear{color:var(--red);}
-.itip-reads li.neut{color:var(--text2);}
+.itip-reads li{font-size:11px;line-height:1.45;padding:5px 9px;border-radius:5px;background:rgba(255,255,255,.04);}
+.itip-reads li.bull{color:var(--green);border-left:2px solid var(--green);}
+.itip-reads li.bear{color:var(--red);border-left:2px solid var(--red);}
+.itip-reads li.neut{color:var(--text2);border-left:2px solid var(--border2);}
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar{width:5px;height:5px;}
@@ -5794,13 +5794,13 @@ const IND_TIPS = {
 };
 
 let _indTipTimer = null;
-function showIndTip(e, key) {
+
+function showIndTip(btn, key) {
   const tip = document.getElementById('indTip');
   const def = IND_TIPS[key];
   if(!tip || !def) return;
   clearTimeout(_indTipTimer);
-  const rows = def.reads.map(r =>
-    `<li class="${r.c}">${r.t}</li>`).join('');
+  const rows = def.reads.map(r => `<li class="${r.c}">${r.t}</li>`).join('');
   tip.innerHTML = `
     <div class="itip-header">
       <div class="itip-dot" style="background:${def.color}"></div>
@@ -5809,31 +5809,34 @@ function showIndTip(e, key) {
     <div class="itip-line">${def.line}</div>
     <div class="itip-desc">${def.desc}</div>
     <ul class="itip-reads">${rows}</ul>`;
-  // Position
-  const rect = e.currentTarget.getBoundingClientRect();
-  const tx = Math.min(rect.left, window.innerWidth - 320);
-  const ty = rect.bottom + 8;
+  // Position below button, clamped within viewport
+  const rect = btn.getBoundingClientRect();
+  const tipW = 310, tipH = 260; // estimated
+  let tx = rect.left;
+  let ty = rect.bottom + 6;
+  if(tx + tipW > window.innerWidth - 8) tx = window.innerWidth - tipW - 8;
+  if(ty + tipH > window.innerHeight - 8) ty = rect.top - tipH - 6;
+  tx = Math.max(8, tx);
   tip.style.left = tx + 'px';
-  tip.style.top  = (ty + window.scrollY) + 'px';
-  tip.style.position = 'fixed';
-  tip.style.top = ty + 'px';
+  tip.style.top  = ty + 'px';
   tip.classList.add('visible');
 }
+
 function hideIndTip() {
   _indTipTimer = setTimeout(() => {
     document.getElementById('indTip')?.classList.remove('visible');
-  }, 120);
+  }, 150);
 }
 
-// Wire up toolbar buttons to rich tooltips
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
-    const key = btn.dataset.ind;
-    if(IND_TIPS[key]) {
-      btn.addEventListener('mouseenter', e => showIndTip(e, key));
-      btn.addEventListener('mouseleave', hideIndTip);
-    }
-  });
+// Event delegation — works for all .toggle-btn[data-ind] buttons at any time
+document.addEventListener('mouseover', e => {
+  const btn = e.target.closest('.toggle-btn[data-ind]');
+  if(!btn) return;
+  const key = btn.dataset.ind;
+  if(IND_TIPS[key]) { clearTimeout(_indTipTimer); showIndTip(btn, key); }
+});
+document.addEventListener('mouseout', e => {
+  if(e.target.closest('.toggle-btn[data-ind]')) hideIndTip();
 });
 
 // ═══════════════════════════════════════
