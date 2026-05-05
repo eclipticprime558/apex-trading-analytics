@@ -36,6 +36,54 @@ body{
   min-height:100vh;overflow-x:hidden;
 }
 
+/* ── Panel expand / pop-out ── */
+.expand-btn{
+  background:none;border:1px solid var(--border);color:var(--text3);
+  font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;
+  line-height:1.6;transition:color .15s,border-color .15s,background .15s;flex-shrink:0;
+  font-family:'Inter',sans-serif;
+}
+.expand-btn:hover{color:var(--accent);border-color:rgba(88,166,255,.5);background:rgba(88,166,255,.06);}
+#expandBackdrop{
+  position:fixed;inset:0;z-index:3999;background:rgba(0,0,0,.8);
+  backdrop-filter:blur(6px);display:none;
+}
+#expandBackdrop.open{display:block;}
+#expandCloseBtn{
+  position:fixed;top:20px;right:24px;z-index:4002;
+  background:var(--bg2);border:1px solid var(--border2);color:var(--text);
+  font-size:18px;width:42px;height:42px;border-radius:8px;cursor:pointer;
+  display:none;align-items:center;justify-content:center;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);transition:background .15s,border-color .15s;
+}
+#expandCloseBtn.open{display:flex;}
+#expandCloseBtn:hover{background:var(--bg3);border-color:var(--red);color:var(--red);}
+.panel-expanded{
+  position:fixed!important;z-index:4000!important;inset:16px!important;
+  border-radius:10px!important;overflow:auto!important;
+  box-shadow:0 28px 80px rgba(0,0,0,.8)!important;
+  max-height:none!important;
+}
+.signal-card.panel-expanded{
+  position:fixed!important;z-index:4000!important;inset:16px!important;
+  border-radius:10px!important;overflow:auto!important;
+  box-shadow:0 28px 80px rgba(0,0,0,.8)!important;
+  text-align:left!important;
+}
+.trade-card.panel-expanded{
+  position:fixed!important;z-index:4000!important;inset:16px!important;
+  border-radius:10px!important;overflow:auto!important;
+  box-shadow:0 28px 80px rgba(0,0,0,.8)!important;
+}
+#chartPanel.panel-expanded{
+  inset:0!important;border-radius:0!important;
+}
+#chartNewsUnder.panel-expanded #chartNewsUnderGrid{
+  grid-template-columns:repeat(3,1fr)!important;
+}
+#tabsPanel.panel-expanded .tbl-wrap{max-height:none!important;}
+#tabsPanel.panel-expanded .stats-grid{grid-template-columns:repeat(4,1fr)!important;}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
@@ -1234,12 +1282,13 @@ body{
 
   <!-- Chart area -->
   <div style="display:flex;flex-direction:column;gap:12px;">
-    <div class="panel">
+    <div class="panel" id="chartPanel">
       <div class="panel-hdr">
         <div class="panel-title" id="chartTitle">PRICE CHART</div>
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
           <div style="font-size:11px;color:var(--text3)" id="chartSubtitle"></div>
           <button id="chartTrackBtn" class="chart-track-btn" onclick="toggleTrackFromChart()" style="display:none">★ Track</button>
+          <button class="expand-btn" onclick="expandPanel('chartPanel')" title="Expand to full screen">⛶ Expand</button>
         </div>
       </div>
       <div class="chart-toolbar" id="toolbar">
@@ -1298,7 +1347,10 @@ body{
     <div class="panel" id="chartNewsUnder" style="display:none">
       <div class="panel-hdr">
         <div class="panel-title" id="chartNewsTicker">📰 Latest News</div>
-        <div style="font-size:10px;color:var(--text3)">Why is this stock moving? Click any headline to read full article.</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <div style="font-size:10px;color:var(--text3)">Why is this stock moving? Click any headline to read full article.</div>
+          <button class="expand-btn" onclick="expandPanel('chartNewsUnder')" title="Expand news panel">⛶ Expand</button>
+        </div>
       </div>
       <div id="chartNewsUnderGrid" style="display:grid;grid-template-columns:1fr 1fr;"></div>
     </div>
@@ -1309,7 +1361,10 @@ body{
 
     <!-- Signal card -->
     <div class="signal-card" id="signalCard">
-      <div class="signal-label">Trading Signal</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div class="signal-label" style="margin-bottom:0">Trading Signal</div>
+        <button class="expand-btn" onclick="expandPanel('signalCard')" title="Expand signal breakdown">⛶</button>
+      </div>
       <div class="signal-main" id="sigMain">—</div>
       <div class="signal-score" id="sigScore">Load data to analyze</div>
       <div class="signal-bar-wrap"><div class="signal-bar" id="sigBar" style="width:50%;background:var(--text3)"></div></div>
@@ -1333,7 +1388,10 @@ body{
     <div class="trade-card" id="tradeCard">
       <div class="panel-hdr">
         <div class="panel-title">Trade Setup</div>
-        <div style="font-size:10px;color:var(--text3)" id="tradeUpdated">Load data</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:10px;color:var(--text3)" id="tradeUpdated">Load data</div>
+          <button class="expand-btn" onclick="expandPanel('tradeCard')" title="Expand trade setup">⛶</button>
+        </div>
       </div>
       <div class="trade-dir" id="tradeDirRow" title="Suggested Direction — LONG means the technical signals favor the price going up (buy and profit from a rise). SHORT means signals favor the price going down. This is determined by combining RSI momentum, MACD crossover direction, and whether the price is above or below key support/resistance levels.">
         <div>
@@ -1355,18 +1413,24 @@ body{
     </div>
 
     <!-- Key Levels -->
-    <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Key Levels</div></div>
+    <div class="panel" id="keyLevelsPanel">
+      <div class="panel-hdr">
+        <div class="panel-title">Key Levels</div>
+        <button class="expand-btn" onclick="expandPanel('keyLevelsPanel')" title="Expand key levels">⛶</button>
+      </div>
       <div class="levels-list" id="levelsList">
         <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Load data to see levels</div>
       </div>
     </div>
 
     <!-- Prediction -->
-    <div class="panel">
+    <div class="panel" id="predPanel">
       <div class="panel-hdr">
         <div class="panel-title">Next Session Forecast</div>
-        <div style="font-size:10px;color:var(--text3)">ATR + RSI + MACD</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:10px;color:var(--text3)">ATR + RSI + MACD</div>
+          <button class="expand-btn" onclick="expandPanel('predPanel')" title="Expand forecast">⛶</button>
+        </div>
       </div>
       <div class="pred-grid" id="predGrid">
         <div class="pred-item full" style="text-align:center;padding:20px;color:var(--text3);font-size:11px;">Load data to forecast</div>
@@ -1374,11 +1438,12 @@ body{
     </div>
 
     <!-- Tabs: Stats / Indicators / Table -->
-    <div class="panel">
-      <div class="tab-bar">
+    <div class="panel" id="tabsPanel">
+      <div class="tab-bar" style="display:flex;align-items:center;">
         <div class="tab active" onclick="switchTab('stats',this)">Stats</div>
         <div class="tab" onclick="switchTab('inds',this)">Indicators</div>
         <div class="tab" onclick="switchTab('table',this)">History</div>
+        <button class="expand-btn" onclick="expandPanel('tabsPanel')" title="Expand stats panel" style="margin-left:auto;margin-right:8px;">⛶</button>
       </div>
       <div class="tab-content active" id="tab-stats">
         <div class="stats-grid" id="statsGrid">
@@ -1407,7 +1472,10 @@ body{
     <div class="panel" id="companyNewsPanel" style="display:none">
       <div class="panel-hdr">
         <div class="panel-title" id="companyNewsTitle">Company News</div>
-        <div style="font-size:10px;color:var(--text3)">Why this signal?</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:10px;color:var(--text3)">Why this signal?</div>
+          <button class="expand-btn" onclick="expandPanel('companyNewsPanel')" title="Expand news">⛶</button>
+        </div>
       </div>
       <div id="companyNewsContainer">
         <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px;">Load data to see news</div>
@@ -1416,6 +1484,10 @@ body{
 
   </div>
 </div>
+
+<!-- Expand / Pop-out overlay -->
+<div id="expandBackdrop" onclick="closeExpand()"></div>
+<button id="expandCloseBtn" onclick="closeExpand()" title="Close (Esc)">✕</button>
 
 <!-- Help FAB -->
 <button class="help-fab" onclick="openHelp()" title="How to use APEX">?</button>
@@ -2505,6 +2577,41 @@ function buildTable() {
   });
   document.getElementById('tblBody').innerHTML=rows.join('');
 }
+
+// ═══════════════════════════════════════
+//  PANEL EXPAND / POP-OUT
+// ═══════════════════════════════════════
+let _expandedPanel = null;
+
+function expandPanel(id) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(_expandedPanel) _collapsePanel(_expandedPanel);
+  _expandedPanel = el;
+  el.classList.add('panel-expanded');
+  document.getElementById('expandBackdrop').classList.add('open');
+  document.getElementById('expandCloseBtn').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // Chart needs a redraw at new size
+  if(id === 'chartPanel' && rawData.length) setTimeout(() => drawChart(), 80);
+}
+
+function closeExpand() {
+  if(!_expandedPanel) return;
+  _collapsePanel(_expandedPanel);
+  _expandedPanel = null;
+  document.getElementById('expandBackdrop').classList.remove('open');
+  document.getElementById('expandCloseBtn').classList.remove('open');
+  document.body.style.overflow = '';
+  if(rawData.length) setTimeout(() => drawChart(), 80);
+}
+
+function _collapsePanel(el) {
+  el.classList.remove('panel-expanded');
+}
+
+// Escape key closes expanded panel
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeExpand(); });
 
 // ═══════════════════════════════════════
 //  TAB + TOGGLE
