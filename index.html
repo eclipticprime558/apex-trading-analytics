@@ -2198,25 +2198,63 @@ function updateSignalCard() {
   const bar=document.getElementById('sigBar');
   bar.style.width=score+'%';bar.style.background=barColor;
 
-  // Score math breakdown
-  const mathParts = factors.filter(f=>f.pts!==0).map(f=>{
-    const c = f.pts>0?'var(--green)':'var(--red)';
-    return `<span style="color:${c}">${f.pts>0?'+':''}${f.pts} ${f.label}</span>`;
-  }).join(' · ');
-  const mathHtml = `<div style="font-size:9px;color:var(--text3);background:var(--bg3);border-radius:4px;padding:5px 8px;margin-bottom:6px;line-height:1.7;">
-    <b style="color:var(--text2)">How we got ${score}:</b> 50 base ${mathParts?'· '+mathParts:''} = <b style="color:var(--text)">${score}</b>
-  </div>`;
+  // ── Step-by-step score math table ──
+  let running = 50;
+  const mathRows = factors.map(f => {
+    const before = running;
+    running = Math.max(0, Math.min(100, running + f.pts));
+    const ptColor = f.pts > 0 ? 'var(--green)' : f.pts < 0 ? 'var(--red)' : 'var(--text3)';
+    const ptStr   = f.pts > 0 ? `+${f.pts}` : f.pts < 0 ? `${f.pts}` : '0';
+    const arrow   = f.pts > 0 ? '▲' : f.pts < 0 ? '▼' : '—';
+    return `<tr>
+      <td style="padding:3px 6px;font-size:10px;color:var(--text2);white-space:nowrap;">${f.icon} ${f.label}</td>
+      <td style="padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);text-align:right;">${f.val}</td>
+      <td style="padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${ptColor};text-align:right;white-space:nowrap;">${arrow} ${ptStr}</td>
+      <td style="padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);text-align:right;">${before} → <b style="color:var(--text)">${running}</b></td>
+    </tr>`;
+  }).join('');
 
-  document.getElementById('sigFactors').innerHTML = mathHtml + factors.map(f=>`
-    <div class="sf-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
-      <div style="display:flex;align-items:center;gap:8px;width:100%">
-        <span class="sf-icon">${f.icon}</span>
-        <span class="sf-label" style="font-weight:500">${f.label}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)">${f.val}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;margin-left:auto;color:${f.pts>0?'var(--green)':f.pts<0?'var(--red)':'var(--text3)'};">${f.pts>0?'+':''}${f.pts}</span>
+  // Why sell/short verdict box
+  const negFactors = factors.filter(f=>f.pts<0);
+  const posFactors = factors.filter(f=>f.pts>0);
+  let verdictHtml = '';
+  if(score < 42) {
+    const topNegs = negFactors.map(f=>`<li style="margin:2px 0;">${f.icon} <b>${f.label}</b> (${f.pts}pts) — ${f.desc}</li>`).join('');
+    verdictHtml = `
+      <div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.3);border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px;">⚠ Why ${label}? — Negative factors dragging the score down:</div>
+        <ul style="font-size:10px;color:var(--text2);line-height:1.7;padding-left:4px;list-style:none;margin:0;">${topNegs}</ul>
+        ${posFactors.length ? `<div style="font-size:9px;color:var(--text3);margin-top:6px;border-top:1px solid rgba(248,81,73,.2);padding-top:5px;">Positive factors (+${posFactors.reduce((s,f)=>s+f.pts,0)}pts): ${posFactors.map(f=>`${f.label} ${f.pts>0?'+':''}${f.pts}`).join(', ')} — not enough to overcome the negatives.</div>` : ''}
+      </div>`;
+  } else if(score >= 58) {
+    const topPos = posFactors.map(f=>`<li style="margin:2px 0;">${f.icon} <b>${f.label}</b> (+${f.pts}pts) — ${f.desc}</li>`).join('');
+    verdictHtml = `
+      <div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.3);border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;">✓ Why ${label}? — Positive factors driving the score up:</div>
+        <ul style="font-size:10px;color:var(--text2);line-height:1.7;padding-left:4px;list-style:none;margin:0;">${topPos}</ul>
+      </div>`;
+  }
+
+  const mathHtml = `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:8px;">
+      <div style="padding:6px 10px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;">
+        <span>SCORE CALCULATION</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)">starts at 50 (neutral)</span>
       </div>
-      <div style="font-size:9px;color:var(--text3);padding-left:24px;line-height:1.4;">${f.desc}</div>
-    </div>`).join('');
+      <table style="width:100%;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border);">
+          <td colspan="3" style="padding:4px 6px;font-size:10px;color:var(--text3);">📍 Baseline</td>
+          <td style="padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);text-align:right;">start = <b style="color:var(--text)">50</b></td>
+        </tr>
+        ${mathRows}
+        <tr style="border-top:2px solid var(--border2);background:rgba(255,255,255,.03);">
+          <td colspan="2" style="padding:6px 8px;font-size:11px;font-weight:700;color:var(--text);">FINAL SCORE</td>
+          <td colspan="2" style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${barColor};text-align:right;">${score} / 100 — ${label}</td>
+        </tr>
+      </table>
+    </div>`;
+
+  document.getElementById('sigFactors').innerHTML = verdictHtml + mathHtml;
 }
 
 // ═══════════════════════════════════════
