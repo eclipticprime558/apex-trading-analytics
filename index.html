@@ -75,12 +75,27 @@ body{
 }
 #expandModalClose:hover{background:rgba(248,81,73,.12);border-color:var(--red);color:var(--red);}
 /* Modal content area (scrollable) */
-#expandContent{overflow-y:auto;padding:18px;flex:1;font-size:13px;line-height:1.55;}
-#expandContent .sc-value{font-size:15px!important;}
-#expandContent .news-headline{font-size:13px!important;}
+#expandContent{overflow-y:auto;padding:20px;flex:1;font-size:14px;line-height:1.6;}
+#expandContent .sc-value{font-size:18px!important;}
+#expandContent .sc-label{font-size:12px!important;}
+#expandContent .signal-main{font-size:28px!important;}
+#expandContent .signal-score{font-size:13px!important;}
+#expandContent .news-headline{font-size:13px!important;line-height:1.5!important;}
+#expandContent .news-meta{font-size:11px!important;}
 #expandContent .stats-grid{grid-template-columns:repeat(3,1fr)!important;}
+#expandContent .stat-val{font-size:15px!important;}
+#expandContent .stat-lbl{font-size:11px!important;}
 #expandContent .tbl-wrap{max-height:none!important;}
 #expandContent #chartNewsUnderGrid{grid-template-columns:repeat(3,1fr)!important;}
+#expandContent table{font-size:13px!important;}
+#expandContent .pi-value{font-size:16px!important;}
+#expandContent .pi-label{font-size:11px!important;}
+#expandContent .pi-sub{font-size:11px!important;}
+#expandContent .levels-list{font-size:13px!important;}
+#expandContent .trade-row{font-size:13px!important;}
+#expandContent .score-math-tbl td{font-size:12px!important;padding:5px 10px!important;}
+#expandContent .signal-factor{font-size:12px!important;}
+#expandModalTitle{font-size:14px;font-weight:700;color:var(--text);letter-spacing:.01em;}
 /* Chart panel: full-screen (charts need maximum space) */
 #chartPanel.panel-expanded{
   position:fixed!important;z-index:4000!important;inset:0!important;
@@ -96,6 +111,27 @@ body{
 }
 #expandCloseBtn.open{display:flex;}
 #expandCloseBtn:hover{background:var(--bg3);border-color:var(--red);color:var(--red);}
+
+/* ── Indicator Rich Tooltip ── */
+#indTip{
+  position:fixed;z-index:9000;
+  background:rgba(13,17,23,.98);border:1px solid var(--border2);
+  border-radius:10px;padding:14px 16px;max-width:300px;
+  box-shadow:0 12px 40px rgba(0,0,0,.8);
+  pointer-events:none;opacity:0;transition:opacity .15s;
+  font-family:'Inter',sans-serif;
+}
+#indTip.visible{opacity:1;}
+.itip-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.itip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.itip-name{font-size:12px;font-weight:700;color:var(--text);}
+.itip-line{font-size:10px;color:var(--text3);margin-bottom:6px;font-style:italic;}
+.itip-desc{font-size:11px;color:var(--text2);line-height:1.55;margin-bottom:8px;}
+.itip-reads{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;}
+.itip-reads li{font-size:11px;line-height:1.4;padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.04);}
+.itip-reads li.bull{color:var(--green);}
+.itip-reads li.bear{color:var(--red);}
+.itip-reads li.neut{color:var(--text2);}
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar{width:5px;height:5px;}
@@ -889,6 +925,52 @@ body{
 .wl-updated{font-size:10px;color:var(--text3);padding:5px 2px 0;}
 @media(max-width:860px){.wl-52wrap,.wl-hide-sm{display:none;}}
 
+/* ── Watchlist Star Rating System ── */
+.wl-star-cell{min-width:110px;}
+.wl-stars-row{display:flex;gap:2px;justify-content:center;font-size:15px;line-height:1;margin-bottom:3px;}
+.wl-star-on{color:#e3b341;text-shadow:0 0 8px rgba(227,179,65,.5);}
+.wl-star-off{color:rgba(139,148,158,.2);}
+.wl-star-label{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);text-align:center;margin-bottom:4px;}
+.wl-star-label.elite{color:#e3b341;font-weight:700;}
+.wl-star-label.strong{color:var(--green);font-weight:600;}
+.wl-star-label.avg{color:var(--accent);}
+.wl-star-label.weak{color:var(--yellow);}
+.wl-star-label.avoid{color:var(--red);}
+/* 7 criteria dots */
+.wl-criteria{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;}
+.wl-crit{
+  width:18px;height:18px;border-radius:50%;font-size:9px;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:default;transition:transform .1s;position:relative;
+  border:1px solid transparent;
+}
+.wl-crit:hover{transform:scale(1.25);z-index:10;}
+.wl-crit.pass{border-color:rgba(255,255,255,.15);}
+.wl-crit.fail{opacity:.28;}
+/* Star criteria legend */
+.wl-legend-toggle{
+  font-size:10px;color:var(--text3);cursor:pointer;padding:4px 0;display:inline-flex;
+  align-items:center;gap:4px;transition:color .15s;user-select:none;margin-top:6px;
+}
+.wl-legend-toggle:hover{color:var(--text);}
+.wl-legend-wrap{
+  display:none;margin-top:8px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+.wl-legend-wrap.open{display:block;}
+.wl-legend-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:1px;background:var(--border);
+}
+.wl-legend-item{
+  background:var(--bg2);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;
+}
+.wl-legend-icon{font-size:18px;flex-shrink:0;margin-top:1px;}
+.wl-legend-body{flex:1;}
+.wl-legend-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.wl-legend-desc{font-size:11px;color:var(--text2);line-height:1.5;}
+.wl-legend-why{font-size:10px;color:var(--text3);margin-top:4px;font-style:italic;}
+
 /* ── Help FAB + Drawer ── */
 .help-fab{
   position:fixed;bottom:24px;right:24px;z-index:8000;
@@ -1543,6 +1625,9 @@ body{
 
   </div>
 </div>
+
+<!-- Indicator rich tooltip -->
+<div id="indTip"></div>
 
 <!-- Expand / Pop-out overlay -->
 <div id="expandBackdrop" onclick="closeExpand()">
@@ -5028,6 +5113,123 @@ async function refreshWatchlist() {
   renderWatchlistBar();
 }
 
+// ── Star Rating Criteria Definitions ──
+const WL_STAR_DEFS = [
+  {
+    key:'macd', icon:'↗', label:'MACD Cross', color:'#58a6ff',
+    title:'MACD Bullish Crossover',
+    desc:'MACD line crossed above the Signal line within the last 3 sessions.',
+    why:'The #1 trend-flip signal used by algorithms and institutions. A fresh cross means momentum just shifted bullish — ideal entry timing.'
+  },
+  {
+    key:'held', icon:'🛡', label:'Held Support', color:'#3fb950',
+    title:'Holding Above Key Low',
+    desc:'Price has NOT dropped below its 10-day low for the last 5 consecutive sessions.',
+    why:'Support is being defended. When buyers consistently step in at the same floor, it signals institutional accumulation — lows get harder to break.'
+  },
+  {
+    key:'rsi', icon:'◎', label:'RSI Zone', color:'#e3b341',
+    title:'RSI in Momentum Zone (50–70)',
+    desc:'RSI is between 50 and 70 — trending up without being overbought.',
+    why:'The sweet spot for trending stocks. Above 50 = bulls in control. Below 70 = still room to run. Overbought RSI (70+) often precedes pullbacks.'
+  },
+  {
+    key:'ma50', icon:'📊', label:'Above MA50', color:'#a371f7',
+    title:'Price Above 50-Day Moving Average',
+    desc:'Current price is above the 50-day moving average.',
+    why:'The most-watched trend line by funds and institutions. Stocks above MA50 are considered in an uptrend. The majority of swing setups require this as a baseline.'
+  },
+  {
+    key:'fib', icon:'🔶', label:'Fibonacci Level', color:'#fb8f44',
+    title:'Near Key Fibonacci Level',
+    desc:'Price is within 2.5% of a major Fibonacci level (38.2%, 50%, or 61.8%) based on the 52-week high/low range.',
+    why:'Fibonacci levels act as invisible magnets. Market participants globally watch these same levels — creating self-fulfilling support/resistance zones where reversals cluster.'
+  },
+  {
+    key:'vol', icon:'📦', label:'Volume Spike', color:'#58a6ff',
+    title:'Volume Confirmation (1.5× Average)',
+    desc:'5-day average volume is at least 1.5× the 20-day average volume.',
+    why:'Volume is the fuel behind price moves. Elevated volume confirms that the move has real participation — not just a thin-air drift. Breakouts on high volume are far more reliable.'
+  },
+  {
+    key:'trend', icon:'⚡', label:'30D Uptrend', color:'#3fb950',
+    title:'30-Day Positive Momentum',
+    desc:'The average daily return over the last 30 sessions is positive and meaningful.',
+    why:'Trend persistence is real — stocks in motion tend to stay in motion. A 30-day uptrend means buyers have been in control for a full trading month, not just a few days.'
+  },
+];
+
+function calcWlStars(q) {
+  if(!q?._candles || q._candles.length < 30) return [];
+  const candles = q._candles;
+  const n       = candles.length;
+  const closes  = candles.map(c => c.close);
+  const highs   = candles.map(c => c.high);
+  const lows    = candles.map(c => c.low);
+  const volumes = candles.map(c => c.volume);
+  const returns = closes.map((c,i) => i===0 ? 0 : (c-closes[i-1])/closes[i-1]*100);
+
+  // 1. MACD bullish cross in last 3 bars
+  const {macd:ma, signal:si} = calcMACD(closes);
+  let macdCrossed = false;
+  for(let i = Math.max(1, n-3); i < n; i++) {
+    if(ma[i]!=null&&si[i]!=null&&ma[i-1]!=null&&si[i-1]!=null)
+      if(ma[i]>si[i] && ma[i-1]<=si[i-1]){ macdCrossed=true; break; }
+  }
+
+  // 2. Held above 10-day low for 5 sessions
+  const low10    = Math.min(...lows.slice(-10));
+  const heldLow  = closes.slice(-5).every(c => c > low10 * 0.993);
+
+  // 3. RSI 50–70
+  const rsiArr   = calcRSI(closes);
+  const lastRSI  = rsiArr.filter(x=>x!=null).pop() || 50;
+  const rsiZone  = lastRSI >= 50 && lastRSI < 70;
+
+  // 4. Above MA50
+  const ma50Arr  = calcMA(closes, 50);
+  const lastMA50 = ma50Arr.filter(x=>x!=null).pop() || closes[n-1];
+  const abvMA50  = closes[n-1] > lastMA50;
+
+  // 5. Near Fibonacci level (38.2%, 50%, 61.8% of 52W range)
+  const hi52 = q.fiftyTwoWeekHigh || Math.max(...highs);
+  const lo52 = q.fiftyTwoWeekLow  || Math.min(...lows);
+  const rng52 = hi52 - lo52 || 1;
+  const fibLevels = [0.236, 0.382, 0.5, 0.618, 0.786].map(f => lo52 + rng52 * f);
+  const price    = closes[n-1];
+  const nearFib  = fibLevels.some(f => Math.abs(price-f)/f < 0.025);
+
+  // 6. Volume spike (5-day avg ≥ 1.5× 20-day avg)
+  const avgVol5  = avg(volumes.slice(-5));
+  const avgVol20 = avg(volumes.slice(-20));
+  const volSpike = avgVol20 > 0 && (avgVol5 / avgVol20) >= 1.5;
+
+  // 7. 30-day positive momentum
+  const mom30    = avg(returns.slice(-30).filter(r=>isFinite(r)));
+  const uptrend  = mom30 > 0.25;
+
+  const vals = { macd:macdCrossed, held:heldLow, rsi:rsiZone, ma50:abvMA50, fib:nearFib, vol:volSpike, trend:uptrend };
+  return WL_STAR_DEFS.map(d => ({ ...d, passed: !!vals[d.key] }));
+}
+
+function buildStarHtml(criteria) {
+  const count   = criteria.filter(c=>c.passed).length;
+  const total   = criteria.length;
+  // Map to 5 visual stars
+  const stars5  = count >= 6 ? 5 : count >= 5 ? 4 : count >= 3 ? 3 : count >= 2 ? 2 : count >= 1 ? 1 : 0;
+  const rating  = stars5 >= 5 ? ['Elite Setup','elite'] : stars5 >= 4 ? ['Strong Setup','strong'] : stars5 >= 3 ? ['Average','avg'] : stars5 >= 2 ? ['Weak Setup','weak'] : ['Avoid','avoid'];
+  const starsHtml = Array.from({length:5}, (_,i) =>
+    `<span class="wl-star-${i<stars5?'on':'off'}">★</span>`).join('');
+  const dotsHtml = criteria.map(c =>
+    `<span class="wl-crit ${c.passed?'pass':'fail'}"
+      style="background:${c.passed?c.color+'22':'rgba(139,148,158,.08)'};border-color:${c.passed?c.color+'55':'transparent'};"
+      title="${c.label}: ${c.desc}${c.passed?' ✓ PASS':' ✗ FAIL'}">${c.icon}</span>`
+  ).join('');
+  return `<div class="wl-stars-row">${starsHtml}</div>
+          <div class="wl-star-label ${rating[1]}">${rating[0]}</div>
+          <div class="wl-criteria">${dotsHtml}</div>`;
+}
+
 function renderWatchlist(showLoading) {
   const container = document.getElementById('watchlistContainer');
   if(!watchlistTickers.length) {
@@ -5070,6 +5272,8 @@ function renderWatchlist(showLoading) {
     const sigStyle = score >= 58 ? 'background:rgba(63,185,80,.15);color:var(--green)'
                    : score >= 42 ? 'background:rgba(210,153,34,.12);color:var(--yellow)'
                    : 'background:rgba(248,81,73,.12);color:var(--red)';
+    const criteria = calcWlStars(q);
+    const starsCell = criteria.length ? buildStarHtml(criteria) : '<div style="color:var(--text3);font-size:10px;">—</div>';
     return `<tr onclick="loadPickStock('${sym}')">
       <td class="wl-td center">
         <div class="wl-score-circle ${scoreCls}"
@@ -5084,6 +5288,7 @@ function renderWatchlist(showLoading) {
       <td class="wl-td right"><div class="wl-price">$${price}</div></td>
       <td class="wl-td right"><span class="wl-chg ${chgCls}">${chgStr}</span></td>
       <td class="wl-td center"><span class="wl-sig" style="${sigStyle}">${label}</span></td>
+      <td class="wl-td center wl-star-cell wl-hide-sm">${starsCell}</td>
       <td class="wl-td wl-52wrap wl-hide-sm">
         <div class="wl-bar-wrap"><div class="wl-bar-fill" style="width:${pos52??0}%;background:${barColor}"></div></div>
         <div class="wl-52w-label">${pos52Str} of 52W range</div>
@@ -5101,6 +5306,17 @@ function renderWatchlist(showLoading) {
   }).filter(Boolean).join('');
 
   const now = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'America/New_York'});
+  // Build legend HTML
+  const legendItems = WL_STAR_DEFS.map(d => `
+    <div class="wl-legend-item">
+      <div class="wl-legend-icon">${d.icon}</div>
+      <div class="wl-legend-body">
+        <div class="wl-legend-title" style="color:${d.color}">${d.title}</div>
+        <div class="wl-legend-desc">${d.desc}</div>
+        <div class="wl-legend-why">💡 ${d.why}</div>
+      </div>
+    </div>`).join('');
+
   container.innerHTML = `
     <div class="watchlist-table-wrap">
       <table class="watchlist-tbl">
@@ -5110,6 +5326,7 @@ function renderWatchlist(showLoading) {
           <th class="right">Price</th>
           <th class="right">Change</th>
           <th class="center">Signal</th>
+          <th class="center wl-hide-sm" title="Setup strength: 7 technical criteria scored as stars. Hover each dot for details.">Setup ★</th>
           <th class="wl-hide-sm">52W Position</th>
           <th class="center wl-hide-sm">Volume</th>
           <th></th>
@@ -5117,11 +5334,218 @@ function renderWatchlist(showLoading) {
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <div class="wl-updated">Updated ${now} ET</div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div class="wl-updated">Updated ${now} ET</div>
+      <span class="wl-legend-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.lg-arrow').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
+        <span class="lg-arrow">▼</span> Star Criteria Guide — what do the ★ ratings mean?
+      </span>
+    </div>
+    <div class="wl-legend-wrap">
+      <div style="padding:12px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);">★ Setup Strength — 7 Criteria Explained</div>
+        <div style="font-size:10px;color:var(--text3);">6–7 pass = Elite &nbsp;·&nbsp; 5 pass = Strong &nbsp;·&nbsp; 3–4 = Average &nbsp;·&nbsp; 1–2 = Weak &nbsp;·&nbsp; 0 = Avoid</div>
+      </div>
+      <div class="wl-legend-grid">${legendItems}</div>
+      <div style="padding:8px 14px;font-size:10px;color:var(--text3);border-top:1px solid var(--border);">
+        ⚠ Star ratings are technical pattern indicators only — not financial advice. Always do your own due diligence.
+      </div>
+    </div>`;
 }
 
 // Render empty state on page load (shows watchlist section immediately)
 document.addEventListener('DOMContentLoaded', () => renderWatchlist(), true);
+
+// ═══════════════════════════════════════
+//  INDICATOR RICH TOOLTIPS
+// ═══════════════════════════════════════
+const IND_TIPS = {
+  ma20:{
+    color:'#d29922', name:'MA20 — 20-Day Moving Average',
+    line:'Gold line drawn on the price chart',
+    desc:'The average of the last 20 daily closing prices. Tracks short-term momentum. Faster than MA50 — it reacts to recent price changes within a month.',
+    reads:[
+      {t:'Price ABOVE MA20 → short-term uptrend, bulls control',c:'bull'},
+      {t:'Price BELOW MA20 → short-term downtrend, bears control',c:'bear'},
+      {t:'MA20 acts as dynamic support in uptrends, resistance in downtrends',c:'neut'},
+      {t:'Watch for price bouncing off or breaking through MA20 as a signal',c:'neut'},
+    ]
+  },
+  ma50:{
+    color:'#fb8f44', name:'MA50 — 50-Day Moving Average',
+    line:'Orange line drawn on the price chart',
+    desc:'The single most-watched trend line by funds, institutions, and algorithms. Defines medium-term trend over ~2.5 trading months. Used in swing trading setups.',
+    reads:[
+      {t:'Price ABOVE MA50 → medium-term uptrend, institutional bullish bias',c:'bull'},
+      {t:'Price BELOW MA50 → medium-term downtrend, avoid or short',c:'bear'},
+      {t:'MACD cross + price above MA50 = highest-probability long setup',c:'bull'},
+      {t:'Funds often add to positions when price bounces from MA50',c:'neut'},
+    ]
+  },
+  ma200:{
+    color:'#a371f7', name:'MA200 — 200-Day Moving Average',
+    line:'Purple line drawn on the price chart',
+    desc:'The long-term market health indicator. 200 trading days ≈ 1 full year. Separates bull markets from bear markets. The most important line for long-term investors.',
+    reads:[
+      {t:'Price ABOVE MA200 → Bull Market regime, favor long positions',c:'bull'},
+      {t:'Price BELOW MA200 → Bear Market regime, risk-off mode',c:'bear'},
+      {t:'"Golden Cross" = MA50 crosses above MA200 → major buy signal',c:'bull'},
+      {t:'"Death Cross" = MA50 crosses below MA200 → major sell signal',c:'bear'},
+    ]
+  },
+  ema9:{
+    color:'#39c5cf', name:'EMA9 — 9-Day Exponential Moving Average',
+    line:'Cyan line drawn on the price chart',
+    desc:'Unlike MA which weights all days equally, EMA9 weights recent days more heavily. It reacts to price faster — used by short-term and day traders for quick entries.',
+    reads:[
+      {t:'Price crosses ABOVE EMA9 → short-term momentum shift up',c:'bull'},
+      {t:'Price crosses BELOW EMA9 → short-term momentum shift down',c:'bear'},
+      {t:'EMA9 + MACD cross together = high-confidence short-term entry',c:'bull'},
+      {t:'Used as trailing stop: exit long when price breaks below EMA9',c:'neut'},
+    ]
+  },
+  bb:{
+    color:'#58a6ff', name:'Bollinger Bands',
+    line:'Blue upper/lower bands + middle line (MA20) on chart',
+    desc:'Volatility envelope: upper and lower bands are ±2 standard deviations from the 20-day MA. The bands expand with volatility and contract when price coils.',
+    reads:[
+      {t:'Price near UPPER band → statistically overbought, pullback risk',c:'bear'},
+      {t:'Price near LOWER band → statistically oversold, bounce potential',c:'bull'},
+      {t:'Band SQUEEZE (bands narrow) → low volatility, breakout imminent',c:'neut'},
+      {t:'"Riding the band" — sustained moves above/below = strong trend',c:'neut'},
+    ]
+  },
+  vwap:{
+    color:'#ffffff', name:'VWAP — Volume Weighted Average Price',
+    line:'White dashed line on the price chart',
+    desc:'The average price weighted by volume — the fair value benchmark used by institutions. Resets each trading session. The most important intraday reference level.',
+    reads:[
+      {t:'Price ABOVE VWAP → buyers in control, bullish intraday bias',c:'bull'},
+      {t:'Price BELOW VWAP → sellers in control, bearish intraday bias',c:'bear'},
+      {t:'Reclaiming VWAP from below → potential intraday reversal up',c:'bull'},
+      {t:'Institutions use VWAP as the benchmark: they buy below, sell above',c:'neut'},
+    ]
+  },
+  rsi:{
+    color:'#3fb950', name:'RSI (14) — Relative Strength Index',
+    line:'Green line in the RSI oscillator panel below chart',
+    desc:'Measures price momentum on a 0–100 scale. Shows whether a stock is moving with unusual speed — either too fast up (overbought) or too fast down (oversold).',
+    reads:[
+      {t:'RSI > 70 → overbought, potential pullback or reversal',c:'bear'},
+      {t:'RSI < 30 → oversold, potential bounce or reversal',c:'bull'},
+      {t:'RSI 50–70 → healthy uptrend momentum zone (the sweet spot)',c:'bull'},
+      {t:'RSI divergence: price makes new high but RSI doesn\'t → warning',c:'neut'},
+    ]
+  },
+  macd:{
+    color:'#f85149', name:'MACD — Moving Average Convergence Divergence',
+    line:'Blue MACD line + Orange signal line + Histogram below chart',
+    desc:'Shows trend direction and momentum by comparing two EMAs. The most widely used trend-following indicator. Generates "B" (buy) and "S" (sell) crossover signals.',
+    reads:[
+      {t:'Blue MACD crosses ABOVE orange Signal → BUY signal (B dot)',c:'bull'},
+      {t:'Blue MACD crosses BELOW orange Signal → SELL signal (S dot)',c:'bear'},
+      {t:'Bright green histogram = growing bullish momentum',c:'bull'},
+      {t:'Bright red histogram = growing bearish momentum (selling pressure)',c:'bear'},
+    ]
+  },
+  fib:{
+    color:'#fb8f44', name:'Fibonacci Retracement & Extensions',
+    line:'Horizontal colored levels drawn on price chart',
+    desc:'Based on the Fibonacci sequence, these levels (23.6%, 38.2%, 50%, 61.8%, 78.6%) mark where price tends to pause or reverse after a major swing move.',
+    reads:[
+      {t:'50–61.8% zone (Golden Zone) → highest probability reversal area',c:'bull'},
+      {t:'Price holding above 61.8% → uptrend structure intact',c:'bull'},
+      {t:'Price breaking below 78.6% → trend reversal likely',c:'bear'},
+      {t:'Extensions 127.2%/161.8% → profit targets after a breakout',c:'neut'},
+    ]
+  },
+  pred:{
+    color:'rgba(88,166,255,.7)', name:'Forecast — 3-Bar Projection',
+    line:'Faded projected candles to the right of the chart',
+    desc:'ATR-based projection showing the probable high/low range for the next 3 sessions. Based on recent volatility (ATR), momentum (MACD), and RSI direction.',
+    reads:[
+      {t:'Green projected candle → bullish bias for next session',c:'bull'},
+      {t:'Red projected candle → bearish bias for next session',c:'bear'},
+      {t:'Wide range = high volatility expected',c:'neut'},
+      {t:'Projection shows probability range, not guaranteed direction',c:'neut'},
+    ]
+  },
+  options:{
+    color:'#3fb950', name:'Calls / Puts Zones',
+    line:'Green CALL zones + Red PUT zones on price chart',
+    desc:'Marks entry zones for options trades based on MACD crossovers and RSI extremes. Green = favorable CALL entry. Red = favorable PUT entry.',
+    reads:[
+      {t:'Green CALL zone → bullish signal, consider call options or long entry',c:'bull'},
+      {t:'Red PUT zone → bearish signal, consider put options or short entry',c:'bear'},
+      {t:'Use with volume confirmation for higher reliability',c:'neut'},
+      {t:'Always check the signal score before acting on a zone',c:'neut'},
+    ]
+  },
+  tradeLines:{
+    color:'#58a6ff', name:'Trade Levels — Entry / Stop / Target',
+    line:'Dashed horizontal lines: blue entry, red stop, green target',
+    desc:'Automatically calculated trade setup levels based on current trend bias, ATR volatility, and nearby support/resistance. Shows suggested entry, stop loss, and take profit.',
+    reads:[
+      {t:'Blue dashed line → suggested entry price',c:'neut'},
+      {t:'Red dashed line → stop loss (exit if price drops here)',c:'bear'},
+      {t:'Green dashed line → take profit target',c:'bull'},
+      {t:'Check risk/reward ratio in the Trade Setup panel before entering',c:'neut'},
+    ]
+  },
+  volume:{
+    color:'#8b949e', name:'Volume Bars',
+    line:'Gray/colored bars at the bottom of the price panel',
+    desc:'Number of shares traded each day. Volume is the fuel behind price moves. High volume confirms a move is real; low volume moves are more likely to reverse.',
+    reads:[
+      {t:'Green bar = up day. Red bar = down day. Height = relative strength',c:'neut'},
+      {t:'Volume spike on a breakout → move is confirmed, likely to continue',c:'bull'},
+      {t:'Price rallies on LOW volume → weak, likely to fade',c:'bear'},
+      {t:'Volume contracting + price rising = distribution (smart money selling)',c:'neut'},
+    ]
+  },
+};
+
+let _indTipTimer = null;
+function showIndTip(e, key) {
+  const tip = document.getElementById('indTip');
+  const def = IND_TIPS[key];
+  if(!tip || !def) return;
+  clearTimeout(_indTipTimer);
+  const rows = def.reads.map(r =>
+    `<li class="${r.c}">${r.t}</li>`).join('');
+  tip.innerHTML = `
+    <div class="itip-header">
+      <div class="itip-dot" style="background:${def.color}"></div>
+      <div class="itip-name">${def.name}</div>
+    </div>
+    <div class="itip-line">${def.line}</div>
+    <div class="itip-desc">${def.desc}</div>
+    <ul class="itip-reads">${rows}</ul>`;
+  // Position
+  const rect = e.currentTarget.getBoundingClientRect();
+  const tx = Math.min(rect.left, window.innerWidth - 320);
+  const ty = rect.bottom + 8;
+  tip.style.left = tx + 'px';
+  tip.style.top  = (ty + window.scrollY) + 'px';
+  tip.style.position = 'fixed';
+  tip.style.top = ty + 'px';
+  tip.classList.add('visible');
+}
+function hideIndTip() {
+  _indTipTimer = setTimeout(() => {
+    document.getElementById('indTip')?.classList.remove('visible');
+  }, 120);
+}
+
+// Wire up toolbar buttons to rich tooltips
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.toggle-btn[data-ind]').forEach(btn => {
+    const key = btn.dataset.ind;
+    if(IND_TIPS[key]) {
+      btn.addEventListener('mouseenter', e => showIndTip(e, key));
+      btn.addEventListener('mouseleave', hideIndTip);
+    }
+  });
+});
 
 // ═══════════════════════════════════════
 //  HELP DRAWER
