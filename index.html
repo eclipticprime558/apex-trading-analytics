@@ -1180,7 +1180,7 @@ body{
     <span class="smf">RSI &#177;18</span>
     <span class="smf">MACD &#177;26</span>
     <span class="smf">MA20/MA50 &#177;16</span>
-    <span class="smf">5D Momentum &#177;10</span>
+    <span class="smf">30D Momentum &#177;10</span>
     <span class="smf">Volume &#177;8</span>
     <span class="smf">Bollinger &#177;10</span>
     <span style="margin-left:4px;">Base 50 + live data factors = 0&#8211;100. Hover any score circle for full breakdown.</span>
@@ -1534,7 +1534,7 @@ body{
       <div class="help-item"><span class="help-icon">📊</span><div class="help-text"><b>RSI (±18 pts)</b> — Relative Strength Index. RSI below 30 (oversold bounce) or above 70 (strong momentum) both score well. Extreme RSI in the right direction = max points.</div></div>
       <div class="help-item"><span class="help-icon">⚡</span><div class="help-text"><b>MACD (±26 pts)</b> — Most heavily weighted factor. A recent bullish crossover (MACD line crossing above signal) adds up to +18 pts. MACD above zero adds another +8 pts.</div></div>
       <div class="help-item"><span class="help-icon">〰️</span><div class="help-text"><b>Moving Averages (±16 pts)</b> — Price above MA20 = +8 pts. Price above MA50 = +8 pts. Confirms the stock is in an uptrend on multiple timeframes.</div></div>
-      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>5-Day Momentum (±10 pts)</b> — How much the price has moved over the last 5 trading days. Captures short-term directional conviction.</div></div>
+      <div class="help-item"><span class="help-icon">📈</span><div class="help-text"><b>30-Day Momentum (±10 pts)</b> — Average daily return over the last 30 trading sessions (~6 weeks). Captures sustained directional conviction — not just a 1-week blip.</div></div>
       <div class="help-item"><span class="help-icon">🔥</span><div class="help-text"><b>Volume Spike (±8 pts)</b> — Today's volume vs 20-day average. 2× normal volume with a rising price = institutions buying = +8 pts. High volume on a down day = −8 pts.</div></div>
       <div class="help-item"><span class="help-icon">📏</span><div class="help-text"><b>Bollinger Bands (±10 pts)</b> — Price breaking above the upper band signals a strong breakout (+10). Price sitting below the lower band signals oversold conditions (+8 for a potential bounce).</div></div>
       <div class="help-item"><span class="help-icon">📡</span><div class="help-text">The <b>same scoring engine</b> powers both Market Picks and the Chart view signal card — scores always match.</div></div>
@@ -2100,7 +2100,7 @@ function recalcIndicators() {
   const lastRSI   = rsi.filter(x=>x!=null).pop()||50;
   const lastMACD  = macd.filter(x=>x!=null).pop()||0;
   const lastSig   = signal.filter(x=>x!=null).pop()||0;
-  const mom5      = avg(returns.slice(-5));
+  const mom5      = avg(returns.slice(-30));
   const avgVol5   = avg(rawData.slice(-5).map(d=>d.volume));
   const avgVol20  = avg(rawData.slice(-20).map(d=>d.volume));
   let bias=0;
@@ -2190,7 +2190,7 @@ function updateSignalCard() {
   const prevMACD=macd[n-2]||0, prevSig=signal[n-2]||0;
   const lma20=ma20[n-1]||lastClose, lma50=ma50[n-1]||lastClose;
   const lbb=bb[n-1];
-  const mom5=avg(returns.slice(-5));
+  const mom30=avg(returns.slice(-30));
   const avgVol5=avg(rawData.slice(-5).map(d=>d.volume));
   const avgVol20=avg(rawData.slice(-20).map(d=>d.volume));
 
@@ -2228,17 +2228,18 @@ function updateSignalCard() {
   else{factors.push({icon:'📉',label:'vs MA50',val:((lastClose/lma50-1)*100).toFixed(1)+'%',pts:ma50Pts,cls:'bear',desc:'Price is BELOW the 50-day moving average — medium-term trend is bearish. Big players often sell here.'});}
   score+=ma50Pts;
 
-  // 5-Day Momentum (±10)
+  // 30-Day Momentum (±10) — avg daily return over last 30 sessions
   let momPts=0;
-  if(mom5>0.2){momPts=+10;factors.push({icon:'⚡',label:'5D Momentum',val:'+'+mom5.toFixed(2)+'%',pts:momPts,cls:'bull',desc:'Stock has risen '+mom5.toFixed(2)+'% over the last 5 days — buyers are pushing it higher.'});}
-  else if(mom5<-0.2){momPts=-10;factors.push({icon:'⚡',label:'5D Momentum',val:mom5.toFixed(2)+'%',pts:momPts,cls:'bear',desc:'Stock has fallen '+Math.abs(mom5).toFixed(2)+'% over the last 5 days — selling pressure is consistent.'});}
-  else{momPts=0;factors.push({icon:'⚡',label:'5D Momentum',val:(mom5>=0?'+':'')+mom5.toFixed(2)+'%',pts:0,cls:'neut',desc:'Price is nearly flat over 5 days — no strong directional move.'});}
+  const mom30pct=(mom30*30).toFixed(1);
+  if(mom30>1.0){momPts=+10;factors.push({icon:'⚡',label:'30D Momentum',val:'+'+mom30pct+'%',pts:momPts,cls:'bull',desc:'Sustained uptrend: ~+'+mom30pct+'% cumulative over 30 sessions — consistent buying pressure over 6 weeks.'});}
+  else if(mom30<-1.0){momPts=-10;factors.push({icon:'⚡',label:'30D Momentum',val:mom30pct+'%',pts:momPts,cls:'bear',desc:'Sustained downtrend: ~'+mom30pct+'% cumulative over 30 sessions — persistent selling over 6 weeks.'});}
+  else{momPts=0;factors.push({icon:'⚡',label:'30D Momentum',val:(mom30>=0?'+':'')+mom30pct+'%',pts:0,cls:'neut',desc:'30-day trend is largely flat — no strong directional conviction from the market.'});}
   score+=momPts;
 
   // Volume (±8, only fires on spike)
   let volPts=0;
   if(avgVol5>avgVol20*1.3){
-    const dir=mom5>0;
+    const dir=mom30>0;
     volPts=dir?+8:-8;
     factors.push({icon:'📦',label:'Volume',val:'+'+((avgVol5/avgVol20-1)*100).toFixed(0)+'% vs avg',pts:volPts,cls:dir?'bull':'bear',
       desc:dir?'Volume spike on a rising price — institutions are buying in size. Confirms the move up.'
@@ -3932,7 +3933,7 @@ function calcSignalScore(candles) {
   const lma20     = ma20Arr[n-1]  || lastClose;
   const lma50     = ma50Arr[n-1]  || lastClose;
   const lbb       = bbArr[n-1];
-  const mom5      = avg(returns.slice(-5));
+  const mom30     = avg(returns.slice(-30));
   const avgVol5   = avg(candles.slice(-5).map(d=>d.volume));
   const avgVol20  = avg(candles.slice(-20).map(d=>d.volume));
 
@@ -3960,13 +3961,14 @@ function calcSignalScore(candles) {
   else                 { score -= 8; factors.push({icon:'📊', label:'Below MA20', detail:`Price ${ma20Pct}% below 20-day avg — short-term downtrend`, pts:-8}); }
   if(lastClose > lma50) score += 8; else score -= 8;
 
-  // 5-day momentum
-  if(mom5 > 0.2)       { score += 10; factors.push({icon:'⚡', label:'5D Momentum +',  detail:`Average daily return +${mom5.toFixed(2)}% over last 5 sessions`, pts:+10}); }
-  else if(mom5 < -0.2) { score -= 10; factors.push({icon:'⚡', label:'5D Momentum −',  detail:`Average daily return ${mom5.toFixed(2)}% over last 5 sessions`, pts:-10}); }
+  // 30-day momentum
+  const mom30pct = (mom30*30).toFixed(1);
+  if(mom30 > 1.0)       { score += 10; factors.push({icon:'⚡', label:'30D Momentum +', detail:`~+${mom30pct}% cumulative over 30 sessions — sustained buying trend`, pts:+10}); }
+  else if(mom30 < -1.0) { score -= 10; factors.push({icon:'⚡', label:'30D Momentum −', detail:`~${mom30pct}% cumulative over 30 sessions — persistent selling trend`, pts:-10}); }
 
   // Volume confirmation
   if(avgVol5 > avgVol20 * 1.3) {
-    const dir = mom5 > 0;
+    const dir = mom30 > 0;
     const volPct = ((avgVol5/avgVol20-1)*100).toFixed(0);
     score += dir ? 8 : -8;
     factors.push({icon:'📦', label:`Volume ${dir?'Confirms':'Warns'}`, detail:`5-day avg volume ${volPct}% above normal — ${dir?'buying pressure confirmed':'selling pressure confirmed'}`, pts:dir?8:-8});
