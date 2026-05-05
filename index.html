@@ -692,6 +692,33 @@ body{
 }
 .picks-refresh-btn:hover{border-color:var(--accent);color:var(--accent);}
 
+/* ── Analyst Consensus Target ── */
+.analyst-row{
+  display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;
+}
+.analyst-target{
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--text);
+}
+.analyst-upside{
+  font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;
+}
+.analyst-upside.up{color:var(--green);}
+.analyst-upside.dn{color:var(--red);}
+.analyst-rec{
+  font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  padding:1px 6px;border-radius:3px;
+}
+.analyst-rec.strong-buy{background:rgba(63,185,80,.2);color:#3fb950;}
+.analyst-rec.buy{background:rgba(63,185,80,.12);color:var(--green);}
+.analyst-rec.hold{background:rgba(210,153,34,.15);color:var(--yellow);}
+.analyst-rec.sell{background:rgba(248,81,73,.12);color:var(--red);}
+.analyst-rec.strong-sell{background:rgba(248,81,73,.2);color:#f85149;}
+.analyst-count{font-size:9px;color:var(--text3);}
+/* Watchlist analyst column */
+.wl-analyst-cell{min-width:130px;}
+.wl-analyst-target{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--text);}
+.wl-analyst-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+
 /* ── Score Tooltip ── */
 #scoreTooltip{
   position:fixed;z-index:9998;pointer-events:none;
@@ -4278,10 +4305,42 @@ const PULSE_SYMS = ['SPY','QQQ','DIA','IWM','^VIX'];
 
 // Fetch a single symbol's quote data via v8/chart (no auth required)
 async function fetchPickQuote(sym) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&includePrePost=false`;
-  const json = await yhFetch(url);
+  const chartUrl   = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d&includePrePost=false`;
+  const analystUrl = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=financialData%2CdefaultKeyStatistics`;
+
+  // Fetch chart + analyst data in parallel; analyst is best-effort
+  const [chartRes, analystRes] = await Promise.allSettled([
+    yhFetch(chartUrl),
+    yhFetch(analystUrl),
+  ]);
+
+  const json   = chartRes.status === 'fulfilled' ? chartRes.value : null;
   const result = json?.chart?.result?.[0];
   if(!result) { dbg(`${sym}: no chart result`,'err'); return null; }
+
+  // Parse analyst consensus + short interest
+  let analystTarget = null, analystHigh = null, analystLow = null, analystCount = null, analystRec = null;
+  let shortPct = null, shortRatio = null, shortPriorPct = null;
+  if(analystRes.status === 'fulfilled') {
+    const qsResult = analystRes.value?.quoteSummary?.result?.[0];
+    const fd  = qsResult?.financialData;
+    const dks = qsResult?.defaultKeyStatistics;
+    if(fd) {
+      analystTarget = fd.targetMeanPrice?.raw  ?? null;
+      analystHigh   = fd.targetHighPrice?.raw  ?? null;
+      analystLow    = fd.targetLowPrice?.raw   ?? null;
+      analystCount  = fd.numberOfAnalystOpinions?.raw ?? null;
+      analystRec    = fd.recommendationKey     ?? null;
+    }
+    if(dks) {
+      shortPct      = dks.shortPercentOfFloat?.raw  ?? null;  // e.g. 0.04 = 4%
+      shortRatio    = dks.shortRatio?.raw           ?? null;  // days to cover
+      const sharesShort      = dks.sharesShort?.raw           ?? null;
+      const sharesShortPrior = dks.sharesShortPriorMonth?.raw ?? null;
+      if(sharesShort && sharesShortPrior && sharesShortPrior > 0)
+        shortPriorPct = ((sharesShort - sharesShortPrior) / sharesShortPrior) * 100;
+    }
+  }
   const meta = result.meta;
   const price = meta.regularMarketPrice;
   const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPreviousClose;
@@ -4324,6 +4383,18 @@ async function fetchPickQuote(sym) {
     technicalLabel: label,
     technicalFactors: factors, // top factors — shown inline on pick cards
     _candles: candles,        // stored for tooltip factor breakdown
+    analystTarget,            // mean analyst price target
+    analystHigh,              // high analyst estimate
+    analystLow,               // low analyst estimate
+    analystCount,             // number of analysts
+    analystRec,               // recommendation key
+    shortPct,                 // short % of float (e.g. 0.04 = 4%)
+    shortRatio,               // days to cover
+    shortPriorPct,            // % change in shares short vs prior month
+    // MoM price change: current close vs ~22 trading days ago
+    momPct: candles.length >= 23
+      ? ((candles[candles.length-1].close - candles[candles.length-23].close) / candles[candles.length-23].close * 100)
+      : null,
   };
 }
 
@@ -4515,6 +4586,35 @@ function pickCls(s)  {
   return s>=72 ? 'strong-buy' : s>=58 ? 'buy' : s>=42 ? 'hold' : s>=28 ? 'sell' : 'strong-sell';
 }
 
+function analystRecLabel(key) {
+  return {strong_buy:'Strong Buy', buy:'Buy', hold:'Hold', sell:'Sell', strong_sell:'Strong Sell'}[key] || key || '—';
+}
+function analystRecCls(key) {
+  return {strong_buy:'strong-buy', buy:'buy', hold:'hold', sell:'sell', strong_sell:'strong-sell'}[key] || 'hold';
+}
+
+// Build analyst target HTML block (used by both pick cards and watchlist)
+function analystHtml(q, currentPrice) {
+  if(!q?.analystTarget) return '';
+  const tgt   = q.analystTarget;
+  const upside= currentPrice ? ((tgt - currentPrice) / currentPrice * 100) : null;
+  const upCls = upside == null ? '' : upside >= 0 ? 'up' : 'dn';
+  const upStr = upside == null ? '' : (upside >= 0 ? '▲ +' : '▼ ') + Math.abs(upside).toFixed(1) + '%';
+  const rec   = q.analystRec;
+  const cnt   = q.analystCount ? `${q.analystCount} analysts` : '';
+  const hiLo  = (q.analystHigh && q.analystLow)
+    ? `$${q.analystLow.toFixed(2)}–$${q.analystHigh.toFixed(2)}`
+    : '';
+  return `<div class="analyst-row">
+    <span style="font-size:9px;color:var(--text3);">Analyst:</span>
+    <span class="analyst-target">$${tgt.toFixed(2)}</span>
+    ${upStr ? `<span class="analyst-upside ${upCls}">${upStr}</span>` : ''}
+    ${rec    ? `<span class="analyst-rec ${analystRecCls(rec)}">${analystRecLabel(rec)}</span>` : ''}
+    ${cnt    ? `<span class="analyst-count">${cnt}</span>` : ''}
+  </div>
+  ${hiLo ? `<div style="font-size:9px;color:var(--text3);margin-top:2px;">Range: ${hiLo}</div>` : ''}`;
+}
+
 // Tooltip explanation — uses same factors from calcSignalScore
 function buildScoreExplain(sym, q, score) {
   const result = calcSignalScore(q._candles || []);
@@ -4566,6 +4666,26 @@ document.addEventListener('mousemove', e => {
   if(tip.style.display === 'block') positionTip(e, tip);
 });
 
+function shortTrendHtml(q) {
+  if(q?.shortPct == null) return '';
+  const pct      = (q.shortPct * 100).toFixed(1);
+  const ratio    = q.shortRatio != null ? q.shortRatio.toFixed(1) + 'd cover' : '';
+  const prior    = q.shortPriorPct;
+  let trendLabel = '', trendCls = '';
+  if(prior != null) {
+    if(prior > 20)       { trendLabel = `▲ +${prior.toFixed(0)}% MoM — Building`;  trendCls = 'dn'; }
+    else if(prior < -20) { trendLabel = `▼ ${prior.toFixed(0)}% MoM — Covering`;   trendCls = 'up'; }
+    else                 { trendLabel = `≈ ${prior >= 0 ? '+' : ''}${prior.toFixed(0)}% MoM — Stable`; trendCls = ''; }
+  }
+  const pctColor = parseFloat(pct) > 20 ? 'var(--red)' : parseFloat(pct) > 8 ? 'var(--yellow)' : 'var(--text2)';
+  return `<div class="analyst-row" style="margin-top:4px;">
+    <span style="font-size:9px;color:var(--text3);">Short:</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:${pctColor}">${pct}% float</span>
+    ${ratio ? `<span style="font-size:9px;color:var(--text3);">${ratio}</span>` : ''}
+    ${trendLabel ? `<span style="font-size:9px;font-weight:600;" class="${trendCls}">${trendLabel}</span>` : ''}
+  </div>`;
+}
+
 function renderPicksCol(colId, tickers, quotes) {
   const col = document.getElementById(colId);
   if(!col) return;
@@ -4609,7 +4729,9 @@ function renderPicksCol(colId, tickers, quotes) {
         <div class="pick-vol-bar" title="Volume ratio vs 3M avg">
           <div class="pick-vol-fill" style="width:${volBarW}%;background:${volBarC}"></div>
         </div>
-        <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}</div>
+        <div class="pick-meta">52W: ${pos52}% &nbsp;·&nbsp; Vol: ${volLabel}${q.momPct != null ? ` &nbsp;·&nbsp; <span class="${q.momPct>=0?'up':'dn'}">${q.momPct>=0?'+':''}${q.momPct.toFixed(1)}% MoM</span>` : ''}</div>
+        ${analystHtml(q, q.regularMarketPrice)}
+        ${shortTrendHtml(q)}
         ${factorHtml ? `<div class="pick-factors">${factorHtml}</div>` : ''}
         <button class="pick-track-btn${isTracked?' tracked':''}"
                 onclick="event.stopPropagation();togglePickTrack('${sym}',this)">${isTracked?'✓ Tracked':'★ Track'}</button>
@@ -5274,6 +5396,38 @@ function renderWatchlist(showLoading) {
                    : 'background:rgba(248,81,73,.12);color:var(--red)';
     const criteria = calcWlStars(q);
     const starsCell = criteria.length ? buildStarHtml(criteria) : '<div style="color:var(--text3);font-size:10px;">—</div>';
+
+    // Analyst target cell
+    const tgt = q.analystTarget;
+    const up  = tgt && q.regularMarketPrice ? ((tgt - q.regularMarketPrice) / q.regularMarketPrice * 100) : null;
+    const upCls = up == null ? '' : up >= 0 ? 'up' : 'dn';
+    const upStr = up == null ? '' : (up >= 0 ? '▲ +' : '▼ ') + Math.abs(up).toFixed(1) + '%';
+    const rec   = q.analystRec;
+    const analystCell = tgt ? `
+      <div class="wl-analyst-target">$${tgt.toFixed(2)}</div>
+      <div class="wl-analyst-sub">${upStr ? `<span class="${upCls}">${upStr}</span>` : ''}${q.analystCount ? ` · ${q.analystCount} analysts` : ''}</div>
+      ${rec ? `<div style="margin-top:3px;"><span class="analyst-rec ${analystRecCls(rec)}">${analystRecLabel(rec)}</span></div>` : ''}
+    ` : '<div style="font-size:10px;color:var(--text3);">—</div>';
+
+    // Short interest cell
+    const si = q.shortPct != null ? (q.shortPct * 100).toFixed(1) + '% float' : null;
+    const siColor = q.shortPct > 0.2 ? 'var(--red)' : q.shortPct > 0.08 ? 'var(--yellow)' : 'var(--text2)';
+    const siTrend = q.shortPriorPct != null
+      ? (q.shortPriorPct > 20 ? `<span class="dn">▲ +${q.shortPriorPct.toFixed(0)}%</span>`
+       : q.shortPriorPct < -20 ? `<span class="up">▼ ${q.shortPriorPct.toFixed(0)}%</span>`
+       : `≈ ${q.shortPriorPct >= 0 ? '+' : ''}${q.shortPriorPct.toFixed(0)}%`)
+      : '';
+    const shortCell = si ? `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${siColor}">${si}</div>
+      <div style="font-size:10px;color:var(--text3);">${q.shortRatio ? q.shortRatio.toFixed(1) + 'd cover' : ''}</div>
+      ${siTrend ? `<div style="font-size:10px;margin-top:2px;">${siTrend} MoM</div>` : ''}
+    ` : '<div style="font-size:10px;color:var(--text3);">—</div>';
+
+    // MoM price change
+    const mom = q.momPct;
+    const momStr = mom != null ? `${mom >= 0 ? '+' : ''}${mom.toFixed(1)}%` : '—';
+    const momCls = mom == null ? '' : mom >= 0 ? 'up' : 'dn';
+
     return `<tr onclick="loadPickStock('${sym}')">
       <td class="wl-td center">
         <div class="wl-score-circle ${scoreCls}"
@@ -5286,8 +5440,15 @@ function renderWatchlist(showLoading) {
         <div class="wl-name" title="${name}">${name}</div>
       </td>
       <td class="wl-td right"><div class="wl-price">$${price}</div></td>
-      <td class="wl-td right"><span class="wl-chg ${chgCls}">${chgStr}</span></td>
+      <td class="wl-td right">
+        <span class="wl-chg ${chgCls}">${chgStr}</span>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Day</div>
+        <span class="wl-chg ${momCls}" style="font-size:11px;">${momStr}</span>
+        <div style="font-size:10px;color:var(--text3);">30-Day</div>
+      </td>
       <td class="wl-td center"><span class="wl-sig" style="${sigStyle}">${label}</span></td>
+      <td class="wl-td wl-analyst-cell wl-hide-sm">${analystCell}</td>
+      <td class="wl-td wl-hide-sm" style="min-width:110px;">${shortCell}</td>
       <td class="wl-td center wl-star-cell wl-hide-sm">${starsCell}</td>
       <td class="wl-td wl-52wrap wl-hide-sm">
         <div class="wl-bar-wrap"><div class="wl-bar-fill" style="width:${pos52??0}%;background:${barColor}"></div></div>
@@ -5324,8 +5485,10 @@ function renderWatchlist(showLoading) {
           <th class="center">Score</th>
           <th>Symbol</th>
           <th class="right">Price</th>
-          <th class="right">Change</th>
+          <th class="right">Change / 30D</th>
           <th class="center">Signal</th>
+          <th class="wl-hide-sm" title="Analyst consensus price target, upside %, and recommendation">Analyst Target</th>
+          <th class="wl-hide-sm" title="Short interest % of float, days to cover, and month-over-month change">Short Interest</th>
           <th class="center wl-hide-sm" title="Setup strength: 7 technical criteria scored as stars. Hover each dot for details.">Setup ★</th>
           <th class="wl-hide-sm">52W Position</th>
           <th class="center wl-hide-sm">Volume</th>
