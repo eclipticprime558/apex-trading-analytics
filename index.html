@@ -2506,11 +2506,18 @@ function updateSignalCard() {
     const ptColor = f.pts > 0 ? 'var(--green)' : f.pts < 0 ? 'var(--red)' : 'var(--text3)';
     const ptStr   = f.pts > 0 ? `+${f.pts}` : f.pts < 0 ? `${f.pts}` : '0';
     const arrow   = f.pts > 0 ? '▲' : f.pts < 0 ? '▼' : '—';
-    return `<tr>
+    const safeDesc = (f.desc||'').replace(/"/g,'&quot;');
+    const ruleNote = f.pts !== 0
+      ? `Points applied: ${ptStr} (rule: ${Math.abs(f.pts)} pts for this condition).`
+      : `No points applied — neutral condition.`;
+    const fullTip = `${f.label}: ${f.desc} — ${ruleNote}`;
+    return `<tr title="${fullTip.replace(/"/g,'&quot;')}" style="cursor:help;transition:background .1s;"
+        onmouseover="this.style.background='rgba(88,166,255,.06)'" onmouseout="this.style.background=''">
       <td style="padding:3px 6px;font-size:10px;color:var(--text2);white-space:nowrap;">${f.icon} ${f.label}</td>
       <td style="padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);text-align:right;">${f.val}</td>
       <td style="padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${ptColor};text-align:right;white-space:nowrap;">${arrow} ${ptStr}</td>
       <td style="padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);text-align:right;">${before} → <b style="color:var(--text)">${running}</b></td>
+      <td style="padding:2px 5px;font-size:10px;color:var(--text3);text-align:center;" title="${safeDesc}">ⓘ</td>
     </tr>`;
   }).join('');
 
@@ -2545,16 +2552,25 @@ function updateSignalCard() {
         <tr style="border-bottom:1px solid var(--border);">
           <td colspan="3" style="padding:4px 6px;font-size:10px;color:var(--text3);">📍 Baseline</td>
           <td style="padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);text-align:right;">start = <b style="color:var(--text)">50</b></td>
+          <td style="padding:4px 5px;font-size:9px;color:var(--text3);text-align:center;" title="Hover any row for a full explanation of that indicator and why the points were applied.">ⓘ</td>
         </tr>
         ${mathRows}
         <tr style="border-top:2px solid var(--border2);background:rgba(255,255,255,.03);">
           <td colspan="2" style="padding:6px 8px;font-size:11px;font-weight:700;color:var(--text);">FINAL SCORE</td>
-          <td colspan="2" style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${barColor};text-align:right;">${score} / 100 — ${label}</td>
+          <td colspan="3" style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${barColor};text-align:right;">${score} / 100 — ${label}</td>
         </tr>
       </table>
     </div>`;
 
-  document.getElementById('sigFactors').innerHTML = verdictHtml + mathHtml;
+  const yhLink = `<div style="text-align:center;padding:8px 6px 4px;border-top:1px solid var(--border);margin-top:2px;">
+    <a href="https://finance.yahoo.com/chart/${ticker}" target="_blank" rel="noopener"
+       style="font-size:10px;color:var(--accent);text-decoration:none;opacity:.8;"
+       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
+      📊 View ${ticker} on Yahoo Finance ↗
+    </a>
+    <span style="font-size:9px;color:var(--text3);margin-left:10px;">· See full chart, fundamentals, news</span>
+  </div>`;
+  document.getElementById('sigFactors').innerHTML = verdictHtml + mathHtml + yhLink;
 }
 
 // ═══════════════════════════════════════
@@ -2700,6 +2716,10 @@ function updateTradeSetup() {
   document.getElementById('rr_ratio').className    = 'rr-value '+(rr1>=2?'up':rr1>=1?'neut':'dn');
   document.getElementById('rr_reward').textContent = '+$'+reward1.toFixed(2);
   document.getElementById('rr_winpct').textContent = winNeeded.toFixed(0)+'%';
+  const td = document.querySelector('.trade-disclaimer');
+  if(td) td.innerHTML = `⚠ Auto-calculated from ATR + S/R. Not financial advice. &nbsp;
+    <a href="https://finance.yahoo.com/chart/${ticker}" target="_blank" rel="noopener"
+       style="color:var(--accent);text-decoration:none;">View ${ticker} on Yahoo Finance ↗</a>`;
 }
 
 // ═══════════════════════════════════════
@@ -2715,23 +2735,23 @@ function updatePrediction() {
   const biasStr = pred.bias>0.2?'BULLISH':pred.bias<-0.2?'BEARISH':'NEUTRAL';
   const biasColor = pred.bias>0.2?'var(--green)':pred.bias<-0.2?'var(--red)':'var(--yellow)';
   document.getElementById('predGrid').innerHTML=`
-    <div class="pred-item">
+    <div class="pred-item" title="Predicted High — The estimated maximum price for the next session. Calculated using ATR (Average True Range, the stock's typical daily move) plus RSI momentum boost when the stock is in a bullish zone. This is the upper bound of the expected price range.">
       <div class="pi-label">Pred. High</div>
       <div class="pi-value up">$${pred.predHigh.toFixed(2)}</div>
     </div>
-    <div class="pred-item">
+    <div class="pred-item" title="Predicted Low — The estimated minimum price for the next session. Calculated using ATR subtracted from the base forecast, adjusted for RSI momentum. This is the lower bound of the expected price range.">
       <div class="pi-label">Pred. Low</div>
       <div class="pi-value dn">$${pred.predLow.toFixed(2)}</div>
     </div>
-    <div class="pred-item">
+    <div class="pred-item" title="Expected Close — The model's best estimate for where the stock will close next session. Based on current price + ATR momentum + MACD direction bias. Not a guarantee — treat as a probability midpoint.">
       <div class="pi-label">Expected Close</div>
       <div class="pi-value" style="color:var(--accent)">$${pred.predMid.toFixed(2)}</div>
     </div>
-    <div class="pred-item">
+    <div class="pred-item" title="ATR (Average True Range) — Measures the stock's average daily price swing over 14 sessions. High ATR = volatile stock with big daily moves. Low ATR = steady, predictable stock. Used to set realistic price targets and stop losses.">
       <div class="pi-label">ATR Range</div>
       <div class="pi-value">$${pred.lastATR.toFixed(2)}</div>
     </div>
-    <div class="pred-item full">
+    <div class="pred-item full" title="Bias — Directional lean of the forecast. Bullish = RSI &gt; 55 and MACD above signal = model expects upward move. Bearish = RSI &lt; 45 and MACD below signal. Neutral = mixed signals. Confidence % reflects how many indicators agree.">
       <div class="pi-label">Bias</div>
       <div class="pi-value" style="color:${biasColor}">${biasStr}</div>
       <div class="conf-bar-wrap"><div class="conf-bar" style="width:${pred.confPct}%"></div></div>
@@ -4737,7 +4757,7 @@ function showScoreTip(e, sym, q, score) {
       <b>${score}</b>
     </div>
     <div class="stt-source">
-      📡 Data: Yahoo Finance (live via server proxy)<br>
+      📡 Data: Yahoo Finance · <a href="https://finance.yahoo.com/chart/${sym}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">View ${sym} chart ↗</a><br>
       ⚠ Technical signals only — not financial advice
     </div>`;
   positionTip(e, tip);
@@ -5509,7 +5529,7 @@ function renderWatchlist(showLoading) {
       return `<tr>
         <td class="wl-td center"><div class="wl-score-circle hold" style="font-size:10px;color:var(--text3)">…</div></td>
         <td class="wl-td"><div class="wl-sym">${sym}</div><div class="wl-name">Loading…</div></td>
-        <td class="wl-td" colspan="5" style="color:var(--text3);font-size:11px;"></td>
+        <td class="wl-td" colspan="3" style="color:var(--text3);font-size:11px;"></td>
         <td class="wl-td"><div class="wl-actions">
           <button class="wl-rm-btn" onclick="event.stopPropagation();removeFromWatchlist('${sym}')" title="Remove">×</button>
         </div></td>
@@ -5539,73 +5559,101 @@ function renderWatchlist(showLoading) {
     const sigStyle = score >= 58 ? 'background:rgba(63,185,80,.15);color:var(--green)'
                    : score >= 42 ? 'background:rgba(210,153,34,.12);color:var(--yellow)'
                    : 'background:rgba(248,81,73,.12);color:var(--red)';
-    const criteria = calcWlStars(q);
-    const starsCell = criteria.length ? buildStarHtml(criteria) : '<div style="color:var(--text3);font-size:10px;">—</div>';
+    // ── Column 1: Score + Signal ──
+    const scoreSig = `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="wl-score-circle ${scoreCls}"
+           onmouseenter="showScoreTip(event,'${sym}',watchlistQuotes['${sym}'],${score})"
+           onmouseleave="hideTip()" title="Hover for score breakdown">${score}</div>
+      <span style="font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+        padding:1px 5px;border-radius:3px;${sigStyle}">${label}</span>
+    </div>`;
 
-    // Analyst target cell
-    const tgt = q.analystTarget;
-    const up  = tgt && q.regularMarketPrice ? ((tgt - q.regularMarketPrice) / q.regularMarketPrice * 100) : null;
-    const upCls = up == null ? '' : up >= 0 ? 'up' : 'dn';
-    const upStr = up == null ? '' : (up >= 0 ? '▲ +' : '▼ ') + Math.abs(up).toFixed(1) + '%';
-    const rec   = q.analystRec;
-    const analystCell = tgt ? `
-      <div class="wl-analyst-target">$${tgt.toFixed(2)}</div>
-      <div class="wl-analyst-sub">${upStr ? `<span class="${upCls}">${upStr}</span>` : ''}${q.analystCount ? ` · ${q.analystCount} analysts` : ''}</div>
-      ${rec ? `<div style="margin-top:3px;"><span class="analyst-rec ${analystRecCls(rec)}">${analystRecLabel(rec)}</span></div>` : ''}
-    ` : '<div style="font-size:10px;color:var(--text3);">—</div>';
+    // ── Column 2: Stock (sym + name + star dots) ──
+    const criteria  = calcWlStars(q);
+    const starCount = criteria.filter(c=>c.passed).length;
+    const stars5    = starCount>=6?5:starCount>=5?4:starCount>=3?3:starCount>=2?2:starCount>=1?1:0;
+    const starsDisp = Array.from({length:5},(_,i)=>
+      `<span style="color:${i<stars5?'#e3b341':'rgba(139,148,158,.2)'}">★</span>`).join('');
+    const dotRow    = criteria.map(c=>
+      `<span title="${c.label}: ${c.passed?'✓ PASS':'✗ FAIL'}"
+        style="width:13px;height:13px;border-radius:50%;display:inline-flex;align-items:center;
+        justify-content:center;font-size:8px;
+        background:${c.passed?c.color+'22':'rgba(139,148,158,.07)'};
+        border:1px solid ${c.passed?c.color+'55':'transparent'};
+        opacity:${c.passed?1:0.35};">${c.icon}</span>`).join('');
+    const stockCell = `<div class="wl-sym">${sym}</div>
+      <div class="wl-name" title="${name}" style="margin-bottom:4px;">${name}</div>
+      <div style="display:flex;gap:1px;font-size:11px;margin-bottom:3px;">${starsDisp}</div>
+      <div style="display:flex;gap:2px;flex-wrap:wrap;">${dotRow}</div>`;
 
-    // Short interest cell
-    const si = q.shortPct != null ? (q.shortPct * 100).toFixed(1) + '% float' : null;
-    const siColor = q.shortPct > 0.2 ? 'var(--red)' : q.shortPct > 0.08 ? 'var(--yellow)' : 'var(--text2)';
-    const siTrend = q.shortPriorPct != null
-      ? (q.shortPriorPct > 20 ? `<span class="dn">▲ +${q.shortPriorPct.toFixed(0)}%</span>`
-       : q.shortPriorPct < -20 ? `<span class="up">▼ ${q.shortPriorPct.toFixed(0)}%</span>`
-       : `≈ ${q.shortPriorPct >= 0 ? '+' : ''}${q.shortPriorPct.toFixed(0)}%`)
-      : '';
-    const shortCell = si ? `
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${siColor}">${si}</div>
-      <div style="font-size:10px;color:var(--text3);">${q.shortRatio ? q.shortRatio.toFixed(1) + 'd cover' : ''}</div>
-      ${siTrend ? `<div style="font-size:10px;margin-top:2px;">${siTrend} MoM</div>` : ''}
-    ` : '<div style="font-size:10px;color:var(--text3);">—</div>';
+    // ── Column 3: Price + Day % + 30D % ──
+    const mom    = q.momPct;
+    const momStr = mom != null ? (mom>=0?'+':'')+mom.toFixed(1)+'%' : '—';
+    const momCls = mom == null ? '' : mom>=0?'up':'dn';
+    const priceCell = `<div class="wl-price" style="margin-bottom:3px;">$${price}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span><span style="font-size:9px;color:var(--text3);">Day </span><span class="wl-chg ${chgCls}" style="font-size:11px;">${chgStr}</span></span>
+        <span><span style="font-size:9px;color:var(--text3);">30D </span><span class="wl-chg ${momCls}" style="font-size:11px;">${momStr}</span></span>
+      </div>
+      <div style="margin-top:4px;">
+        <div class="wl-bar-wrap" title="${pos52Str} of 52W range" style="margin-bottom:2px;">
+          <div class="wl-bar-fill" style="width:${pos52??0}%;background:${barColor}"></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);">52W: ${pos52Str}</div>
+      </div>`;
 
-    // MoM price change
-    const mom = q.momPct;
-    const momStr = mom != null ? `${mom >= 0 ? '+' : ''}${mom.toFixed(1)}%` : '—';
-    const momCls = mom == null ? '' : mom >= 0 ? 'up' : 'dn';
+    // ── Column 4: Analyst Target ──
+    const tgt    = q.analystTarget;
+    const upside = tgt && q.regularMarketPrice ? ((tgt-q.regularMarketPrice)/q.regularMarketPrice*100) : null;
+    const upCls  = upside==null?'':upside>=0?'up':'dn';
+    const upStr  = upside==null?'':(upside>=0?'▲ +':'▼ ')+Math.abs(upside).toFixed(1)+'%';
+    const rec    = q.analystRec;
+    const analystCell = tgt
+      ? `<div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text);">$${tgt.toFixed(2)}</div>
+         <div style="display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap;">
+           ${upStr?`<span class="${upCls}" style="font-size:11px;font-weight:600;">${upStr}</span>`:''}
+           ${rec?`<span class="analyst-rec ${analystRecCls(rec)}" style="font-size:9px;">${analystRecLabel(rec)}</span>`:''}
+         </div>
+         ${q.analystCount?`<div style="font-size:9px;color:var(--text3);margin-top:2px;">${q.analystCount} analysts</div>`:''}`
+      : '<span style="font-size:10px;color:var(--text3);">No data</span>';
+
+    // ── Column 5: Short Interest + Volume ──
+    const si       = q.shortPct != null ? (q.shortPct*100).toFixed(1)+'%' : null;
+    const siColor  = q.shortPct>0.2?'var(--red)':q.shortPct>0.08?'var(--yellow)':'var(--text2)';
+    const siTrend  = q.shortPriorPct!=null
+      ? (q.shortPriorPct>20?`<span class="dn" style="font-size:9px;">▲ building</span>`
+        :q.shortPriorPct<-20?`<span class="up" style="font-size:9px;">▼ covering</span>`
+        :`<span style="font-size:9px;color:var(--text3);">≈ stable</span>`) : '';
+    const vRatio   = (q.regularMarketVolume && q.averageDailyVolume3Month && q.averageDailyVolume3Month>0)
+      ? (q.regularMarketVolume / q.averageDailyVolume3Month) : null;
+    const vCls     = !vRatio?'':vRatio>=3?'up':vRatio>=1.5?'up':vRatio<0.6?'dn':'';
+    const vLabel   = vRatio ? vRatio.toFixed(1)+'× avg' : '—';
+    const vBadge   = vRatio>=3?'🔥 Spike':vRatio>=1.5?'↑ High':vRatio<0.6?'↓ Low':'';
+    const siVolCell = `
+      ${si?`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+        <span style="font-size:9px;color:var(--text3);">Short:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${siColor};">${si}</span>
+        ${q.shortRatio?`<span style="font-size:9px;color:var(--text3);">${q.shortRatio.toFixed(1)}d</span>`:''}
+      </div>
+      ${siTrend?`<div style="margin-bottom:4px;">${siTrend}</div>`:''}`:
+      '<div style="font-size:9px;color:var(--text3);margin-bottom:4px;">Short: —</div>'}
+      <div style="display:flex;align-items:center;gap:5px;">
+        <span style="font-size:9px;color:var(--text3);">Vol:</span>
+        <span class="${vCls}" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;">${vLabel}</span>
+        ${vBadge?`<span style="font-size:9px;color:var(--green);">${vBadge}</span>`:''}
+      </div>
+      ${q.volPctile!=null?`<div style="font-size:9px;color:var(--text3);margin-top:2px;">${q.volPctile}th pctile</div>`:''}`;
 
     return `<tr onclick="loadPickStock('${sym}')">
-      <td class="wl-td center">
-        <div class="wl-score-circle ${scoreCls}"
-             onmouseenter="showScoreTip(event,'${sym}',watchlistQuotes['${sym}'],${score})"
-             onmouseleave="hideTip()"
-             title="Hover for score breakdown">${score}</div>
-      </td>
-      <td class="wl-td">
-        <div class="wl-sym">${sym}</div>
-        <div class="wl-name" title="${name}">${name}</div>
-      </td>
-      <td class="wl-td right"><div class="wl-price">$${price}</div></td>
-      <td class="wl-td right">
-        <span class="wl-chg ${chgCls}">${chgStr}</span>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Day</div>
-        <span class="wl-chg ${momCls}" style="font-size:11px;">${momStr}</span>
-        <div style="font-size:10px;color:var(--text3);">30-Day</div>
-      </td>
-      <td class="wl-td center"><span class="wl-sig" style="${sigStyle}">${label}</span></td>
-      <td class="wl-td wl-analyst-cell wl-hide-sm">${analystCell}</td>
-      <td class="wl-td wl-hide-sm" style="min-width:110px;">${shortCell}</td>
-      <td class="wl-td center wl-star-cell wl-hide-sm">${starsCell}</td>
-      <td class="wl-td wl-52wrap wl-hide-sm">
-        <div class="wl-bar-wrap"><div class="wl-bar-fill" style="width:${pos52??0}%;background:${barColor}"></div></div>
-        <div class="wl-52w-label">${pos52Str} of 52W range</div>
-      </td>
-      <td class="wl-td wl-hide-sm" style="min-width:120px;">
-        ${volStatsHtml(q)}
-      </td>
+      <td class="wl-td center" style="width:56px;">${scoreSig}</td>
+      <td class="wl-td" style="min-width:160px;max-width:220px;">${stockCell}</td>
+      <td class="wl-td" style="min-width:110px;">${priceCell}</td>
+      <td class="wl-td wl-hide-sm" style="min-width:120px;">${analystCell}</td>
+      <td class="wl-td wl-hide-sm" style="min-width:120px;">${siVolCell}</td>
       <td class="wl-td">
         <div class="wl-actions">
           <button class="wl-chart-btn" onclick="event.stopPropagation();loadPickStock('${sym}')" title="Open chart">→ Chart</button>
-          <button class="wl-rm-btn" onclick="event.stopPropagation();removeFromWatchlist('${sym}')" title="Remove from watchlist">×</button>
+          <button class="wl-rm-btn" onclick="event.stopPropagation();removeFromWatchlist('${sym}')" title="Remove">×</button>
         </div>
       </td>
     </tr>`;
@@ -5627,16 +5675,11 @@ function renderWatchlist(showLoading) {
     <div class="watchlist-table-wrap">
       <table class="watchlist-tbl">
         <thead><tr>
-          <th class="center">Score</th>
-          <th>Symbol</th>
-          <th class="right">Price</th>
-          <th class="right">Change / 30D</th>
-          <th class="center">Signal</th>
+          <th class="center" style="width:64px;">Score</th>
+          <th>Stock</th>
+          <th title="Price, day change %, 30-day change %, and 52-week position bar">Price &amp; Changes</th>
           <th class="wl-hide-sm" title="Analyst consensus price target, upside %, and recommendation">Analyst Target</th>
-          <th class="wl-hide-sm" title="Short interest % of float, days to cover, and month-over-month change">Short Interest</th>
-          <th class="center wl-hide-sm" title="Setup strength: 7 technical criteria scored as stars. Hover each dot for details.">Setup ★</th>
-          <th class="wl-hide-sm">52W Position</th>
-          <th class="wl-hide-sm" title="Volume today, averages, trend, percentile rank, and sparkline">Volume Stats</th>
+          <th class="wl-hide-sm" title="Short interest % of float, days to cover, MoM trend, volume ratio, and percentile rank">Short / Volume</th>
           <th></th>
         </tr></thead>
         <tbody>${rows}</tbody>
